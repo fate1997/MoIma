@@ -1,3 +1,7 @@
+# repo-specific
+*debug.ipynb
+Reference/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
