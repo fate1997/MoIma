@@ -4,16 +4,23 @@ from typing import List
 import torch
 from tqdm import tqdm
 
-from MolGEN.dataset._util import one_hot_encoding
+from MolGEN.data_pipeline._util import one_hot_encoding
+from MolGEN.data_pipeline._base import BaseFeaturizer
 
-
-class SMILESFeaturizer:
+class SMILESFeaturizer(BaseFeaturizer):
     
     def __init__(self, 
                  charset: List[str], 
                  pad_length: int=120):
         self.pad_length = pad_length
         self.charset = charset
+    
+    def __dict__(self):
+        dic = {
+            'charset': self.charset,
+            'pad_length': self.pad_length
+        }
+        return dic
     
     @classmethod
     def from_smiles_list(cls, 
@@ -23,14 +30,6 @@ class SMILESFeaturizer:
         """
         charset = cls._get_charset(smiles_list)
         return cls(charset, pad_length)
-    
-    def __call__(self, smiles_list: List[str]):
-        r"""Featurize a list of SMILES strings into a tensor.
-        """
-        embeddings = []
-        for smiles in tqdm(smiles_list, desc='SMILES featurization'):
-            embeddings.append(self._featurize(smiles))
-        return torch.stack(embeddings)
     
     def _featurize(self, smiles: str) -> torch.Tensor:
         r"""Featurize a SMILES string into a one-hot encoding.
@@ -61,18 +60,15 @@ class SMILESFeaturizer:
         r"""Decode SMILES encodings into a SMILES list.
         
         Args:
-            x (torch.Tensor): SMILES encodings, shape of [num_smiles, pad_length, 
+            x (torch.Tensor): SMILES encoding, shape of [pad_length, 
                 charset_length].
         
         Returns:
             A list of SMILES strings.
         """
-        smiles_list = []
-        for encoding in x:
-            charset_idx = torch.argmax(encoding, dim=1)
-            smiles = "".join(map(lambda x: self.charset[x], charset_idx)).strip()
-            smiles_list.append(smiles)
-        return smiles_list
+        charset_idx = torch.argmax(x, dim=1)
+        smiles = "".join(map(lambda x: self.charset[x], charset_idx)).strip()
+        return smiles
 
 
 if __name__ == '__main__':
@@ -81,8 +77,8 @@ if __name__ == '__main__':
         'CCO',
         'CC(=O)O',
     ]
-    featurnizer = SMILESFeaturizer.from_smiles_list(smiles_list)
-    x = featurnizer(smiles_list)
+    featurizer = SMILESFeaturizer.from_smiles_list(smiles_list)
+    x = featurizer(smiles_list[0])
     print(f"SMILES encodings shape: {x.shape}")
-    smiles_list = featurnizer.decode(x)
-    print(f"SMILES list: {smiles_list}")
+    smiles = featurizer.decode(x)
+    print(f"SMILES list: {smiles}")

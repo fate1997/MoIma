@@ -26,7 +26,7 @@ class ChemicalVAE(nn.Module):
     def loss_func(self, 
                   x: torch.Tensor, x_hat: torch.Tensor, 
                   mu: torch.Tensor, logvar: torch.Tensor):
-        reconstruction_loss = F.binary_cross_entropy(x_hat, x)
+        reconstruction_loss = F.binary_cross_entropy(x_hat, x, reduction='sum')
         kl_divergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         return reconstruction_loss + kl_divergence
 
@@ -87,19 +87,19 @@ class Decoder(nn.Module):
 
 if __name__ == '__main__':
     # Test Encoder
-    encoder = Encoder()
-    x = torch.randn(5, 120, 35).softmax(dim=2)
+    encoder = Encoder(channels=36)
+    x = torch.randn(5, 120, 36).softmax(dim=2)
     output = encoder(x)
     print(f"Encoder output shape: {output[0].shape}")
     
     # Test Decoder
-    decoder = Decoder()
+    decoder = Decoder(channels=36)
     z = torch.randn(5, 292)
     output = decoder(z)
     print(f"Decoder output shape: {output.shape}")
     
     # Test ChemicalVAE
-    model = ChemicalVAE()
+    model = ChemicalVAE(vocab_size=36)
     output = model(x)
     print(f"ChemicalVAE output shape: {output[0].shape}")
     # print(output)

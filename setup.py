@@ -11,5 +11,5 @@ setup(
     packages=find_packages(include=['MolGEN', 'MolGEN.*', 'MolGEN.*.*']),
     include_package_data=True,
     url='https://github.com/fate1997/MolGEN',
-    version='0.0.0',
+    version='0.0.1',
 )
