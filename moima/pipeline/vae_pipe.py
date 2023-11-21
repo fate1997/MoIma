@@ -1,11 +1,12 @@
 import torch
 from torch import nn
-from MolGEN.model import ChemicalVAE
 from torch.utils.data import DataLoader
-from MolGEN.data_pipeline.dataset import SMILESDataset
-from MolGEN.data_pipeline.featurizer import SMILESFeaturizer
-from MolGEN.config.vae_config import VAEPipeConfig
 from tqdm import tqdm
+
+from moima.config.vae_config import VAEPipeConfig
+from moima.dataset.smiles_seq.dataset import SeqDataset
+from moima.dataset.smiles_seq.featurizer import SeqFeaturizer
+from moima.model import ChemicalVAE
 
 
 class VAEPipe:
@@ -14,8 +15,8 @@ class VAEPipe:
         self.model = ChemicalVAE(**config.model).to(config.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), 
                                           lr=config.train['lr'])
-        self.dataset = SMILESDataset(raw_path=config.dataset['raw_path'],
-                                     Featurizer=SMILESFeaturizer)
+        self.dataset = SeqDataset(raw_path=config.dataset['raw_path'],
+                                  Featurizer=SeqFeaturizer)
         self.featurizer = self.dataset.featurizer
         self.train_loader = DataLoader(self.dataset, 
                                         batch_size=config.train['batch_size'], 

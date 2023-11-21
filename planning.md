@@ -1,3 +1,6 @@
+2023-11-20
+- [ ] All class to be a simple factory
+
 2023-11-03
 - [x] Finish `featurizer` part
 - [x] Partially finish `Pipeline` part
