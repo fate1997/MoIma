@@ -6,12 +6,12 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class ChemicalVAE(nn.Module):
     def __init__(self, 
-                 vocab_size=35,
-                 enc_hidden_dim=292,
-                 latent_dim=292,
-                 emb_dim=128,
-                 dec_hidden_dim=501,
-                 dropout=0.1):
+                 vocab_size: int=35,
+                 enc_hidden_dim: int=292,
+                 latent_dim: int=292,
+                 emb_dim: int=128,
+                 dec_hidden_dim: int=501,
+                 dropout: float=0.1):
         super().__init__()
         self.encoder = Encoder(vocab_size, 
                                emb_dim, 

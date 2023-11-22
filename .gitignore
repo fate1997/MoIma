@@ -1,4 +1,5 @@
 # repo-specific
+output/
 *debug.ipynb
 Reference/
 example/

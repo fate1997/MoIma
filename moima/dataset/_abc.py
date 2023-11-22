@@ -39,7 +39,7 @@ class FeaturizerABC(ABC):
         """Return the input arguments of the featurizer."""
     
     @classmethod
-    def from_dict(cls, **kwargs):
+    def from_dict(cls, **kwargs) -> 'FeaturizerABC':
         """Create a featurizer from a dictionary."""
         return cls(**kwargs)
 
@@ -49,19 +49,17 @@ class DatasetABC(Dataset):
     
     def __init__(self,
                  raw_path: str,
-                 featurizer_config: dict,
-                 Featurzier: FeaturizerABC,
+                 featurizer: FeaturizerABC,
                  processed_path: str = None,
                  force_reload: bool = False,
                  save_processed: bool = False):
         super().__init__()
         
         self.raw_path = raw_path
-        self.featurizer_config = featurizer_config
         self.force_reload = force_reload
         self.save_processed = save_processed
         
-        self.featurizer = Featurzier.from_dict(**self.featurizer_config)
+        self.featurizer = featurizer
         
         if processed_path is None:
             processed_path = os.path.splitext(raw_path)[0] + '.pt'

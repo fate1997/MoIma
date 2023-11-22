@@ -1,1 +1,1 @@
-from ._factory import DatasetFactory
+from ._factory import DatasetFactory, FeaturizerFactory

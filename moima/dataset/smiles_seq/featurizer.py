@@ -9,7 +9,7 @@ from moima.dataset.smiles_seq.data import SeqData
 
 DEFAULT_CHARSET = [' ', '$', '!', '#', '(', ')', '+', '-', '/', '1', '2', '3', '4',
  '5', '6', '7', '8', '=', '@', 'C', 'F', 'G', 'H', 'I', 'N', 'O', 'P', 'R', 'S', '[',
- '\\', ']', 'c', 'n', 'o', 's']
+ '\\', ']', 'c', 'n', 'o', 's', '.']
 
 
 class SeqFeaturizer(FeaturizerABC):
@@ -31,6 +31,14 @@ class SeqFeaturizer(FeaturizerABC):
     
     def __repr__(self) -> str:
         return f"SeqFeaturizer(seq_len: {self.seq_len})"
+    
+    @property
+    def __dict__(self) -> dict:
+        return {
+            'charset': self.charset,
+            'seq_len': self.seq_len,
+            'vocab_size': self.vocab_size,
+        }
     
     @property
     def charset_dict(self):
@@ -79,7 +87,7 @@ class SeqFeaturizer(FeaturizerABC):
                 s.add(c)
         charset = sorted(list(s))
         charset = [self.PAD, self.SOS, self.EOS] + charset
-        return charset  
+        self.charset = charset
     
     def decode(self, x: torch.Tensor, is_raw: bool=True) -> List[str]:
         r"""Decode SMILES encodings into a SMILES list.
@@ -103,6 +111,10 @@ class SeqFeaturizer(FeaturizerABC):
         for k, v in self.DOUBLE_TOKEN_DICT.items():
             smiles = smiles.replace(v, k)
         return smiles
+    
+    @property
+    def vocab_size(self):
+        return len(self.charset)
 
 
 if __name__ == '__main__':

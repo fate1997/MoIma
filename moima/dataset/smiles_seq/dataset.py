@@ -12,13 +12,11 @@ from moima.dataset.smiles_seq.featurizer import SeqFeaturizer
 class SMILESSeq(DatasetABC):
     def __init__(self, 
                  raw_path: str,
-                 featurizer_config: dict,
-                 Featurizer: FeaturizerABC = SeqFeaturizer,
+                 featurizer: FeaturizerABC,
                  processed_path: str = None,
                  force_reload: bool = False,
                  save_processed: bool = False):
-        super().__init__(raw_path, featurizer_config, Featurizer,
-                         processed_path, force_reload, save_processed)
+        super().__init__(raw_path, featurizer, processed_path, force_reload, save_processed)
     
     @staticmethod
     def collate_fn(batch: List[SeqData]):
