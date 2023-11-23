@@ -3,24 +3,26 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from moima.pipeline.vae.config import VAEPipeConfig
+from moima.pipeline.vade.config import VaDEPipeConfig
 from moima.pipeline.pipe import PipeABC
 
 
-class VAEPipe(PipeABC):
-    def __init__(self, config: VAEPipeConfig):
+class VaDEPipe(PipeABC):
+    def __init__(self, config: VaDEPipeConfig):
         super().__init__(config)
     
     def _forward_batch(self, batch):
         batch.to(self.device)
-        mu, logvar, x_hat = self.model(batch.x, batch.seq_len)
-        loss = self.loss_fn(batch, mu, logvar, x_hat, self.current_epoch)
+        x_hat, mu, logvar, qc = self.model(batch.x, batch.seq_len)
+        loss = self.loss_fn(batch, x_hat, mu, logvar, self.model, self.current_epoch)
+        self.training_trace.update(self.loss_fn.loss_items)
         return x_hat, loss
     
     def _interested_info(self, batch, output):
         info = {}
         info['Label'] = self.featurizer.decode(batch.x[0], is_raw=True)
         info['Reconstruction'] = self.featurizer.decode(output[0], is_raw=False)
+        info.update(self.training_trace)
         return info
     
     @property
@@ -37,7 +39,13 @@ class VAEPipe(PipeABC):
             pad_idx = featurizer.charset_dict[featurizer.PAD]      
             max_len = featurizer.seq_len
             
-            z = torch.randn(num_samples, model.h2mu.out_features)
+            center = 5
+            mu_c = model.mu_c[center]
+            logvar_c = model.logvar_c[center]
+            std = torch.exp(0.5 * logvar_c)
+            eps = torch.randn_like(std.repeat(num_samples, 1))
+            z = mu_c + eps * std
+            
             if num_samples == 1:
                 z_0 = z.view(1, 1, -1) 
             else:
@@ -80,5 +88,5 @@ class VAEPipe(PipeABC):
     
     
 if __name__ == '__main__':
-    config = VAEPipeConfig.from_args()
+    config = VaDEPipeConfig.from_args()
     

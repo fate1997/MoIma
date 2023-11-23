@@ -4,6 +4,7 @@ from ._abc import LossCalcABC
 import numpy as np
 import torch.nn.functional as F
 from moima.utils._util import KL_divergence
+from moima.dataset._abc import DataABC
 
 
 class VAELossCalc(LossCalcABC):
@@ -28,11 +29,17 @@ class VAELossCalc(LossCalcABC):
         self.kl_scheduler = kl_scheduler
     
     def __call__(self, 
+                 batch: DataABC,
                  mu: torch.Tensor,
                  logvar: torch.Tensor,
-                 recon_loss: torch.Tensor,
+                 x_hat: torch.Tensor,
                  current_epoch: int) -> torch.Tensor:
         """Calculate the loss."""
         kl_weight = self.kl_scheduler[current_epoch]
-        kl_loss = kl_weight * KL_divergence(mu, logvar)
+        kl_loss = kl_weight * KL_divergence(mu, logvar) / mu.size(0)
+        seq = batch.x
+        seq_len = batch.seq_len
+        recon_loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
+                                              seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
+                                              ignore_index=0)
         return recon_loss + kl_loss

@@ -2,9 +2,11 @@ from typing import List, Literal
 
 from ._abc import LossCalcABC
 from .vae_loss import VAELossCalc
+from .vade_loss import VaDELossCalc
 
 LOSS_FN_REGISTRY = {
     "vae_loss": VAELossCalc,
+    "vade_loss": VaDELossCalc,
 }
 
 

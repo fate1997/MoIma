@@ -25,7 +25,8 @@ def get_logger(name: str, log_dir: str):
         os.makedirs(log_dir)
     
     logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s - [%(levelname)s] - %(message)s',
+                        format='%(asctime)s: %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S',
                         handlers=[logging.FileHandler(os.path.join(log_dir, name)),
                                   logging.StreamHandler(sys.stdout)])
     logger = logging.getLogger(name)

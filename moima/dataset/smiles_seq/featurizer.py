@@ -28,6 +28,7 @@ class SeqFeaturizer(FeaturizerABC):
                  seq_len: int=120):
         self.seq_len = seq_len
         self.charset = charset
+        self.set_charset_dict()
     
     def __repr__(self) -> str:
         return f"SeqFeaturizer(seq_len: {self.seq_len})"
@@ -40,9 +41,8 @@ class SeqFeaturizer(FeaturizerABC):
             'vocab_size': self.vocab_size,
         }
     
-    @property
-    def charset_dict(self):
-        return {c: i for i, c in enumerate(self.charset)}
+    def set_charset_dict(self):
+        self.charset_dict =  {c: i for i, c in enumerate(self.charset)}
     
     @property
     def input_args(self):
@@ -88,6 +88,7 @@ class SeqFeaturizer(FeaturizerABC):
         charset = sorted(list(s))
         charset = [self.PAD, self.SOS, self.EOS] + charset
         self.charset = charset
+        self.set_charset_dict()
     
     def decode(self, x: torch.Tensor, is_raw: bool=True) -> List[str]:
         r"""Decode SMILES encodings into a SMILES list.

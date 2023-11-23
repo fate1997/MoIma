@@ -4,7 +4,7 @@ from moima.pipeline.config import ArgType, DefaultConfig
 
 
 @dataclass
-class VAEPipeConfig(DefaultConfig):
+class VaDEPipeConfig(DefaultConfig):
     """The configuration for the pipeline."""
     
     # Featurizer
@@ -13,7 +13,7 @@ class VAEPipeConfig(DefaultConfig):
                                       'type': ArgType.FEATURZIER})
     
     # Model
-    model_name: str = field(default='chemical_vae',
+    model_name: str = field(default='vade',
                             metadata={'help': 'The model name.',
                                       'type': ArgType.MODEL})
     vocab_size: int = field(default=38,
@@ -36,10 +36,14 @@ class VAEPipeConfig(DefaultConfig):
                                       'type': ArgType.MODEL})
     
     # Loss_fn
-    start_kl_weight: float = field(default=0.0,
-                                   metadata={'help': 'The start kl weight.',
-                                             'type': ArgType.LOSS_FN})
     end_kl_weight: float = field(default=0.0025,
-                                    metadata={'help': 'The end kl weight.',
-                                            'type': ArgType.LOSS_FN})
+                            metadata={'help': 'The end kl weight.',
+                                      'type': ArgType.LOSS_FN})
+    end_center_weight: float = field(default=0.25,
+                            metadata={'help': 'The end center weight.',
+                                      'type': ArgType.LOSS_FN})
+    loss_fn_name: str = field(default='vade_loss',
+                            metadata={'help': 'The loss function name.',
+                                      'type': ArgType.LOSS_FN})
+    
     

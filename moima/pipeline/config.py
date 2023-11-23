@@ -48,7 +48,7 @@ class DefaultConfig:
     split_test: bool = field(default=True,
                                 metadata={'help': 'Whether to split the test set.',
                                         'type': ArgType.SPLITTER})
-    batch_size: int = field(default=64,
+    batch_size: int = field(default=128,
                                 metadata={'help': 'The batch size of the dataloader.',
                                         'type': ArgType.SPLITTER})
     seed: int = field(default=42,
@@ -90,7 +90,7 @@ class DefaultConfig:
     device: str = field(default='cuda',
                         metadata={'help': 'The device to use.',
                                 'type': ArgType.GENERAL})
-    lr: float = field(default=1e-3,
+    lr: float = field(default=1e-4,
                         metadata={'help': 'The learning rate.',
                                 'type': ArgType.GENERAL})
     

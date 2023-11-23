@@ -1,4 +1,5 @@
 from .vae.chemical_vae import ChemicalVAE
+from .vae.vade import VaDE
 from torch import nn
 from typing import Literal, List
 from dataclasses import Field
@@ -6,6 +7,7 @@ from dataclasses import Field
 
 MODEL_REGISTRY = {
     "chemical_vae": ChemicalVAE,
+    "vade": VaDE,
 }
 
 

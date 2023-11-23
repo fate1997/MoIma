@@ -1,3 +1,12 @@
+2023-11-23
+- [ ] Maybe loss should be calculated in the `forward` function of the model (some loss have parameters like beta)
+- [ ] model's `forward` function should input the `data` object, and output a `dict` object, which contains the `loss` and `output` of the model
+- [ ] Multiple loss should be supported
+- [ ] SMILESFeaturizer is much lower than VANILA
+- [ ] sample function should be in the model
+- [ ] self.training_trace
+
+
 2023-11-20
 - [ ] All class to be a simple factory
 

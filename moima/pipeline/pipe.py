@@ -34,6 +34,8 @@ class PipeABC(ABC):
                 
         self.loss_fn = LossCalcFactory.create(**self.config.loss_fn)
         self.featurizer = FeaturizerFactory.create(**self.config.featurizer)
+        
+        self.training_trace = {}
        
     @abstractmethod
     def _forward_batch(self, batch: DataABC) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -62,6 +64,7 @@ class PipeABC(ABC):
     
     def train(self):
         """Train the model."""
+        self.logger.info(f"{repr(self.config)}")
         self.load_dataset()
         
         self.logger.info("Model Loading".center(60, "-"))
@@ -77,11 +80,11 @@ class PipeABC(ABC):
         self.logger.info("Training".center(60, "-"))
         self.model.train()
         n_epoch = self.config.num_epochs
-        total_iter = len(self.train_loader.dataset) // self.train_loader.batch_size
+        total_iter = len(self.train_loader.dataset) // self.train_loader.batch_size * n_epoch
         starting_time = time.time()
+        current_iter = 0
         for epoch in range(n_epoch):
             self.current_epoch = epoch
-            current_iter = 0
             for batch in tqdm(self.train_loader, desc=f'Epoch {epoch}'):
                 output, loss = self._forward_batch(batch)
                 self.optimizer.zero_grad()
@@ -89,14 +92,16 @@ class PipeABC(ABC):
                 clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()             
                 current_iter += 1
-                if current_iter % self.config.log_interval == 0 or current_iter == total_iter:
-                    default_info = f'[{epoch+1}|{current_iter}/{total_iter}]'\
+                if current_iter % self.config.log_interval == 0:
+                    default_info = f'[Epoch {epoch+1}|{current_iter}/{total_iter}]'\
                                    f'[Loss: {loss.item():.4f}]'
                     interested_info = self._interested_info(batch, output)
                     info = default_info + ''.join([f'[{k}: {v}]' for k, v in interested_info.items()])
                     self.logger.info(info)
-                if current_iter % self.config.save_interval == 0 or current_iter == total_iter:
+                if current_iter % self.config.save_interval == 0:
                     self.save(**self.custom_saveitems)
+        
+        self.save(**self.custom_saveitems)
         
         time_elapsed = (time.time() - starting_time) / 60
         self.logger.info(f"Training finished in {time_elapsed:.2f} minutes")
@@ -121,7 +126,7 @@ class PipeABC(ABC):
         basic_info.update(kwargs)
         
         time = datetime.now().strftime("%H-%M-%d-%m-%Y")
-        save_name = f'pipeline_{self.config.desc}_{time}.pt'
+        save_name = f'{self.__class__.__name__}_{self.config.desc}_{time}.pt'
         save_path = os.path.join(self.config.output_folder, save_name)
         
         torch.save(basic_info, save_path)
