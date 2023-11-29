@@ -3,6 +3,7 @@ output/
 *debug.ipynb
 Reference/
 example/
+.pretrain
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

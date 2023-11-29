@@ -31,20 +31,18 @@ class VaDE(nn.Module):
                                dec_hidden_dim, 
                                vocab_size, 
                                emb_dim)
+        
         self.h2mu = nn.Linear(enc_hidden_dim, latent_dim)
         self.h2logvar = nn.Linear(enc_hidden_dim, latent_dim)
-        self.h2pi = nn.Linear(enc_hidden_dim, n_clusters)
-        self.z2theta = nn.Linear(latent_dim, latent_dim)
         
-        self.pi = nn.Parameter(torch.ones(n_clusters) / n_clusters, requires_grad=True)
-        self.mu_c = nn.Parameter(torch.rand(n_clusters, latent_dim), requires_grad=True) # zeros will cause nan
-        self.logvar_c = nn.Parameter(torch.zeros(n_clusters, latent_dim), requires_grad=True)
+        self.pi_=nn.Parameter(torch.FloatTensor(n_clusters,).fill_(1)/n_clusters, requires_grad=True)
+        self.mu_c=nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
+        self.logvar_c=nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
         
         self.gmm = GaussianMixture(n_components=n_clusters, 
-                                   covariance_type='diag', 
-                                   max_iter=200, 
-                                   reg_covar=1e-5)
+                                   covariance_type='diag')
         self.n_clusters = n_clusters
+        self.latent_dim = latent_dim
         self.apply(weight_init)
         
     def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor):
@@ -52,29 +50,87 @@ class VaDE(nn.Module):
         eps = torch.randn_like(std)
         return mu + eps * std
     
-    def forward(self, seq: torch.Tensor, seq_len: torch.Tensor):
+    def get_latent(self, seq: torch.Tensor, seq_len: torch.Tensor):
+        with torch.no_grad():
+            hidden = self.encoder(seq, seq_len)
+            mu = self.h2mu(hidden)
+            return mu
+    
+    def forward(self, seq: torch.Tensor, seq_len: torch.Tensor, is_pretrain: bool=False):
         
         hidden = self.encoder(seq, seq_len)
         mu, logvar = self.h2mu(hidden), self.h2logvar(hidden)
-        qc = torch.softmax(self.h2pi(hidden), dim=1)
-        z = self.reparameterize(mu, logvar)
-        theta = self.z2theta(z)
-        x_hat = self.decoder(theta, seq, seq_len)
-        collate_fn=lambda x: F.softmax(x,dim=1)
-        theta = collate_fn(theta)       
-        return x_hat, mu, logvar, qc
+        if is_pretrain == False:
+            z = self.reparameterize(mu, logvar)
+        else:
+            z = mu
+             
+        x_hat = self.decoder(z, seq, seq_len)
+        return x_hat, mu, logvar
     
+    def ELBO_Loss(self,batch,L=1):
+        det=1e-10
+
+        L_rec=0
+        seq, seq_len = batch.x, batch.seq_len
+        latent_output = self.encoder(seq, seq_len)
+        z_mu, z_sigma2_log = self.h2mu(latent_output), self.h2logvar(latent_output)
+        for l in range(L):
+
+            z=torch.randn_like(z_mu)*torch.exp(z_sigma2_log/2)+z_mu
+
+            x_hat = self.decoder(z, seq, seq_len)
+
+            recon_loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
+                                    seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
+                                    ignore_index=0)
+            L_rec+=recon_loss
+
+        L_rec/=L
+
+        Loss=L_rec*batch.x.size(1)
+
+        pi=self.pi_
+        log_sigma2_c=self.logvar_c
+        mu_c=self.mu_c
+
+        z = torch.randn_like(z_mu) * torch.exp(z_sigma2_log / 2) + z_mu
+        yita_c=torch.exp(torch.log(pi.unsqueeze(0))+self.gaussian_pdfs_log(z,mu_c,log_sigma2_c))+det
+
+        yita_c=yita_c/(yita_c.sum(1).view(-1,1))#batch_size*Clusters
+
+        Loss+=0.5*torch.mean(torch.sum(yita_c*torch.sum(log_sigma2_c.unsqueeze(0)+
+                                                torch.exp(z_sigma2_log.unsqueeze(1)-log_sigma2_c.unsqueeze(0))+
+                                                (z_mu.unsqueeze(1)-mu_c.unsqueeze(0)).pow(2)/torch.exp(log_sigma2_c.unsqueeze(0)),2),1))
+
+        Loss-=torch.mean(torch.sum(yita_c*torch.log(pi.unsqueeze(0)/(yita_c)),1))+0.5*torch.mean(torch.sum(1+z_sigma2_log,1))
+
+        return x_hat, Loss    
+    
+    def gaussian_pdfs_log(self,x,mus,log_sigma2s):
+        G=[]
+        for c in range(self.n_clusters):
+            G.append(self.gaussian_pdf_log(x,mus[c:c+1,:],log_sigma2s[c:c+1,:]).view(-1,1))
+        return torch.cat(G,1)
+
+    @staticmethod
+    def gaussian_pdf_log(x,mu,log_sigma2):
+        return -0.5*(torch.sum(np.log(np.pi*2)+log_sigma2+(x-mu).pow(2)/torch.exp(log_sigma2),1))
+
     def gmm_kl_div(self, mu: torch.Tensor, logvar: torch.Tensor):
         zs = self.reparameterize(mu, logvar)
         mu_c = self.mu_c
         logvar_c = self.logvar_c
         delta = 1e-10
+        print(f'zs range: {zs.min().item()} - {zs.max().item()}, mu_c range: {mu_c.min().item()} - {mu_c.max().item()}')
         gamma_c = torch.exp(torch.log(self.pi.unsqueeze(0))+self.log_pdfs_gauss(zs,mu_c,logvar_c))+delta
+        print(f'raw gamma_c range: {gamma_c.min().item()} - {gamma_c.max().item()}')
         gamma_c = gamma_c / (gamma_c.sum(dim=1).view(-1,1))
 
         kl_div = 0.5 * torch.mean(torch.sum(gamma_c*torch.sum(logvar_c.unsqueeze(0)+
                         torch.exp(logvar.unsqueeze(1)-logvar_c.unsqueeze(0))+
                         (mu.unsqueeze(1)-mu_c.unsqueeze(0)).pow(2)/(torch.exp(logvar_c.unsqueeze(0))),dim=2),dim=1))
+        print(f'gamma_c range: {gamma_c.min().item()} - {gamma_c.max().item()}, pi range: {self.pi.min().item()} - {self.pi.max().item()}')
         kl_div -= torch.mean(torch.sum(gamma_c*torch.log(self.pi.unsqueeze(0)/gamma_c),dim=1)) + \
                   0.5*torch.mean(torch.sum(1+logvar,dim=1))
         return kl_div
@@ -135,7 +191,6 @@ def weight_init(m):
     elif isinstance(m, nn.Embedding):
         nn.init.constant_(m.weight, 1)
         
-
 
 if __name__ == '__main__':
     model = VaDE()

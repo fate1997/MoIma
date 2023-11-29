@@ -62,19 +62,23 @@ class PipeABC(ABC):
         self.val_loader = val_loader
         self.test_loader = test_loader
     
-    def train(self):
-        """Train the model."""
-        self.logger.info(f"{repr(self.config)}")
-        self.load_dataset()
-        
+    def load_model(self):
+        """Load the model."""
         self.logger.info("Model Loading".center(60, "-"))
-        
         model_config = self.config.model
         for key, value in model_config.items():
             if key in self.featurizer.__dict__:
                 featurizer_value = getattr(self.featurizer, key)
                 model_config[key] = featurizer_value
         self.model = ModelFactory.create(**model_config).to(self.device)
+    
+    def train(self):
+        """Train the model."""
+        self.logger.info(f"{repr(self.config)}")
+        if 'train_loader' not in self.__dict__:
+            self.load_dataset()
+        if 'model' not in self.__dict__:
+            self.load_model()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.lr)
         
         self.logger.info("Training".center(60, "-"))
@@ -85,15 +89,27 @@ class PipeABC(ABC):
         current_iter = 0
         for epoch in range(n_epoch):
             self.current_epoch = epoch
-            for batch in tqdm(self.train_loader, desc=f'Epoch {epoch}'):
+            for batch in self.train_loader:
+                for name, params in self.model.named_parameters():
+                    if torch.isnan(params).any():
+                        print(current_iter, name, params)
+                        raise ValueError
+                current_iter += 1
+                if current_iter in range(1600, 1700):
+                    continue
+                
                 output, loss = self._forward_batch(batch)
+                if torch.isnan(loss):
+                    print(current_iter, loss)
+                    raise ValueError
+
                 self.optimizer.zero_grad()
                 loss.backward()
                 clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()             
-                current_iter += 1
-                if current_iter % self.config.log_interval == 0:
-                    default_info = f'[Epoch {epoch+1}|{current_iter}/{total_iter}]'\
+                
+                if current_iter % self.config.log_interval == 0 or current_iter == total_iter:
+                    default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'\
                                    f'[Loss: {loss.item():.4f}]'
                     interested_info = self._interested_info(batch, output)
                     info = default_info + ''.join([f'[{k}: {v}]' for k, v in interested_info.items()])

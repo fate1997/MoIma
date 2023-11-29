@@ -5,12 +5,12 @@ import numpy as np
 
 class VaDELossCalc:
     def __init__(self, 
-                 start_kl_weight: float = 0.0,
+                 start_kl_weight: float = 0.0001,
                  end_kl_weight: float = 0.0025,
                  num_epochs: int = 100,
                  n_cycles: int = 5,
                  ratio: float = 0.7,
-                 start_center_weight: float = 0.0,
+                 start_center_weight: float = 0.00001,
                  end_center_weight: float = 1e7):
         self.kl_scheduler = self.loss_annealing(start_kl_weight, 
                                                 end_kl_weight, 
@@ -24,7 +24,7 @@ class VaDELossCalc:
                                                     ratio)
     
     def loss_annealing(self, 
-                       start_weight: float = 0.0,
+                       start_weight: float = 0.00001,
                         end_weight: float = 0.0025,
                         num_epochs: int = 100,
                         n_cycles: int = 5,
@@ -48,11 +48,15 @@ class VaDELossCalc:
         recon_loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
                                     seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
                                     ignore_index=0)
-        kl_loss = self.kl_scheduler[current_epoch] * model.gmm_kl_div(mu, logvar)
+        kl_loss_weight = self.kl_scheduler[current_epoch]
+        raw_kl_loss = model.gmm_kl_div(mu, logvar)
+        kl_loss = kl_loss_weight * raw_kl_loss
         center_mut_dists = self.center_scheduler[current_epoch] * model.mus_mutual_distance()
-        
-        self.loss_items = {'recon_loss': recon_loss.item(),
-                           'kl_loss': kl_loss.item(),
-                           'center_mut_dists': center_mut_dists.item()}
+
+        self.loss_items = {'recon_loss': recon_loss,
+                           'kl_loss': kl_loss,
+                           'center_mut_dists': center_mut_dists,
+                           'raw_kl_loss': raw_kl_loss,
+                           'kl_loss_weight': kl_loss_weight,}
         
         return recon_loss + kl_loss + center_mut_dists

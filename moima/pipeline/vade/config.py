@@ -39,7 +39,7 @@ class VaDEPipeConfig(DefaultConfig):
     end_kl_weight: float = field(default=0.0025,
                             metadata={'help': 'The end kl weight.',
                                       'type': ArgType.LOSS_FN})
-    end_center_weight: float = field(default=0.25,
+    end_center_weight: float = field(default=2.5,
                             metadata={'help': 'The end center weight.',
                                       'type': ArgType.LOSS_FN})
     loss_fn_name: str = field(default='vade_loss',

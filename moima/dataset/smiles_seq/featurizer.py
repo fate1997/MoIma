@@ -2,10 +2,10 @@ import warnings
 from typing import Any, List
 
 import torch
+from rdkit import Chem
 
 from moima.dataset._abc import FeaturizerABC
 from moima.dataset.smiles_seq.data import SeqData
-
 
 DEFAULT_CHARSET = [' ', '$', '!', '#', '(', ')', '+', '-', '/', '1', '2', '3', '4',
  '5', '6', '7', '8', '=', '@', 'C', 'F', 'G', 'H', 'I', 'N', 'O', 'P', 'R', 'S', '[',
@@ -80,6 +80,7 @@ class SeqFeaturizer(FeaturizerABC):
         """
         s = set()
         for smiles in smiles_list:
+            smiles = Chem.CanonSmiles(smiles)
             # Replace double tokens to single tokens
             for k, v in self.DOUBLE_TOKEN_DICT.items():
                 smiles = smiles.replace(k, v)

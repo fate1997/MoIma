@@ -5,6 +5,10 @@ from tqdm import tqdm
 
 from moima.pipeline.vade.config import VaDEPipeConfig
 from moima.pipeline.pipe import PipeABC
+import os
+import itertools
+import numpy as np
+import torch.nn.functional as F
 
 
 class VaDEPipe(PipeABC):
@@ -13,23 +17,75 @@ class VaDEPipe(PipeABC):
     
     def _forward_batch(self, batch):
         batch.to(self.device)
-        x_hat, mu, logvar, qc = self.model(batch.x, batch.seq_len)
-        loss = self.loss_fn(batch, x_hat, mu, logvar, self.model, self.current_epoch)
-        self.training_trace.update(self.loss_fn.loss_items)
+        x_hat, loss = self.model.ELBO_Loss(batch)
         return x_hat, loss
     
     def _interested_info(self, batch, output):
         info = {}
         info['Label'] = self.featurizer.decode(batch.x[0], is_raw=True)
         info['Reconstruction'] = self.featurizer.decode(output[0], is_raw=False)
-        info.update(self.training_trace)
         return info
     
     @property
     def custom_saveitems(self):
         return {'featurizer': self.featurizer}
     
-    def sample(self, num_samples: int=10):
+    def pretrain(self, pre_epoch=50, retrain=False):
+        self.load_dataset()
+        dataloader = self.train_loader
+        self.load_model()
+        if (not os.path.exists('.pretrain/vade_pretrain.wght')) or retrain==True:
+            if not os.path.exists('.pretrain/'):
+                os.mkdir('.pretrain')
+            optimizer = torch.optim.Adam(itertools.chain(self.model.encoder.parameters(),\
+                self.model.h2mu.parameters(),\
+                    self.model.h2logvar.parameters(),\
+                        self.model.decoder.parameters()))
+
+            self.logger.info('Pretrain the VaDE'.center(60,'-'))
+            self.model.train()
+            n_iter = 0
+            for epoch in range(pre_epoch):
+                self.current_epoch = epoch
+                for batch in dataloader:
+                    optimizer.zero_grad()
+                    batch.to(self.device)
+                    seq, seq_len = batch.x, batch.seq_len
+                    x_hat, mu, logvar = self.model(seq, seq_len, is_pretrain=True)
+                    recon_loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
+                                    seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
+                                    ignore_index=0)
+                    recon_loss.backward()
+                    optimizer.step()
+                    n_iter += 1
+                    if n_iter % self.config.log_interval == 0:
+                        self.logger.info(f'Epoch: {epoch}, Iter: {n_iter}, Rec: {recon_loss.item():.4f}')
+            
+            self.model.h2logvar.load_state_dict(self.model.h2mu.state_dict())
+            self.logger.info('Initialize GMM parameters'.center(60,'-'))
+            Z = []
+            with torch.no_grad():
+                for batch in dataloader:
+                    batch.to(self.device)
+
+                    x_hat, mu, logvar = self.model(batch.x, batch.seq_len, is_pretrain=True)
+                    assert F.mse_loss(mu, logvar) == 0
+                    Z.append(mu)
+
+            Z = torch.cat(Z, 0).detach().cpu().numpy()
+            
+            self.model.gmm.fit(Z)
+            self.model.pi_.data = torch.from_numpy(self.model.gmm.weights_).to(self.device).float()
+            self.model.mu_c.data = torch.from_numpy(self.model.gmm.means_).to(self.device).float()
+            self.model.logvar_c.data = torch.log(torch.from_numpy(self.model.gmm.covariances_)).to(self.device).float()
+
+            torch.save(self.model.state_dict(),'.pretrain/vade_pretrain.wght')
+            print('Store the pretrain weights at dir .pretrain/vade_pretrain.wght')
+
+        else:
+            self.model.load_state_dict(torch.load('.pretrain/vade_pretrain.wght'))
+    
+    def sample(self, num_samples: int=10, center: int=5):
         self.model.eval()
         with torch.no_grad():
             model = self.model.to('cpu')
