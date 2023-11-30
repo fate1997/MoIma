@@ -17,11 +17,15 @@ class VaDEPipe(PipeABC):
     
     def _forward_batch(self, batch):
         batch.to(self.device)
-        x_hat, loss = self.model.ELBO_Loss(batch)
-        return x_hat, loss
+        x_hat, recon_loss, kl_loss = self.loss_fn(batch, self.model, self.current_epoch)
+        self.info = {'Reconstruction': recon_loss.item(), 
+                     'KL': kl_loss.item(),
+                     'gamma_c': f'{self.model.yita_c.min().item()}~{self.model.yita_c.max().item()}'}
+        return x_hat, recon_loss + kl_loss
     
     def _interested_info(self, batch, output):
         info = {}
+        info.update(self.info)
         info['Label'] = self.featurizer.decode(batch.x[0], is_raw=True)
         info['Reconstruction'] = self.featurizer.decode(output[0], is_raw=False)
         return info
@@ -34,9 +38,8 @@ class VaDEPipe(PipeABC):
         self.load_dataset()
         dataloader = self.train_loader
         self.load_model()
-        if (not os.path.exists('.pretrain/vade_pretrain.wght')) or retrain==True:
-            if not os.path.exists('.pretrain/'):
-                os.mkdir('.pretrain')
+        pretrained_path = os.path.join(self.config.output_folder, f'vade_pretrain_{self.config.desc}.wght')
+        if (not os.path.exists(pretrained_path)) or retrain==True:
             optimizer = torch.optim.Adam(itertools.chain(self.model.encoder.parameters(),\
                 self.model.h2mu.parameters(),\
                     self.model.h2logvar.parameters(),\
@@ -79,11 +82,11 @@ class VaDEPipe(PipeABC):
             self.model.mu_c.data = torch.from_numpy(self.model.gmm.means_).to(self.device).float()
             self.model.logvar_c.data = torch.log(torch.from_numpy(self.model.gmm.covariances_)).to(self.device).float()
 
-            torch.save(self.model.state_dict(),'.pretrain/vade_pretrain.wght')
-            print('Store the pretrain weights at dir .pretrain/vade_pretrain.wght')
+            torch.save(self.model.state_dict(), pretrained_path)
+            print(f'Store the pretrain weights at dir {pretrained_path}')
 
         else:
-            self.model.load_state_dict(torch.load('.pretrain/vade_pretrain.wght'))
+            self.model.load_state_dict(torch.load(pretrained_path))
     
     def sample(self, num_samples: int=10, center: int=5):
         self.model.eval()

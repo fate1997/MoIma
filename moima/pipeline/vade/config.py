@@ -16,7 +16,7 @@ class VaDEPipeConfig(DefaultConfig):
     model_name: str = field(default='vade',
                             metadata={'help': 'The model name.',
                                       'type': ArgType.MODEL})
-    vocab_size: int = field(default=38,
+    vocab_size: int = field(default=36,
                             metadata={'help': 'The vocabulary size.',
                                       'type': ArgType.MODEL})
     enc_hidden_dim: int = field(default=292,

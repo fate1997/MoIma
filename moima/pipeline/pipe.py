@@ -34,7 +34,7 @@ class PipeABC(ABC):
                 
         self.loss_fn = LossCalcFactory.create(**self.config.loss_fn)
         self.featurizer = FeaturizerFactory.create(**self.config.featurizer)
-        
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.lr)
         self.training_trace = {}
        
     @abstractmethod
@@ -79,7 +79,6 @@ class PipeABC(ABC):
             self.load_dataset()
         if 'model' not in self.__dict__:
             self.load_model()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.lr)
         
         self.logger.info("Training".center(60, "-"))
         self.model.train()
@@ -95,8 +94,6 @@ class PipeABC(ABC):
                         print(current_iter, name, params)
                         raise ValueError
                 current_iter += 1
-                if current_iter in range(1600, 1700):
-                    continue
                 
                 output, loss = self._forward_batch(batch)
                 if torch.isnan(loss):
@@ -112,7 +109,7 @@ class PipeABC(ABC):
                     default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'\
                                    f'[Loss: {loss.item():.4f}]'
                     interested_info = self._interested_info(batch, output)
-                    info = default_info + ''.join([f'[{k}: {v}]' for k, v in interested_info.items()])
+                    info = default_info + ''.join([f'[{k}: {round(v, 4) if type(v) is float else v}]' for k, v in interested_info.items()])
                     self.logger.info(info)
                 if current_iter % self.config.save_interval == 0:
                     self.save(**self.custom_saveitems)

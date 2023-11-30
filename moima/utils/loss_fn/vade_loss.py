@@ -42,21 +42,8 @@ class VaDELossCalc:
                 i += 1
         return scheduler
             
-    def __call__(self, batch, x_hat, mu, logvar, model, current_epoch):
-        seq = batch.x
-        seq_len = batch.seq_len
-        recon_loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
-                                    seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
-                                    ignore_index=0)
-        kl_loss_weight = self.kl_scheduler[current_epoch]
-        raw_kl_loss = model.gmm_kl_div(mu, logvar)
-        kl_loss = kl_loss_weight * raw_kl_loss
-        center_mut_dists = self.center_scheduler[current_epoch] * model.mus_mutual_distance()
-
-        self.loss_items = {'recon_loss': recon_loss,
-                           'kl_loss': kl_loss,
-                           'center_mut_dists': center_mut_dists,
-                           'raw_kl_loss': raw_kl_loss,
-                           'kl_loss_weight': kl_loss_weight,}
-        
-        return recon_loss + kl_loss + center_mut_dists
+    def __call__(self, batch, model, current_epoch):
+        x_hat, recon_loss, kl_loss = model.ELBO_Loss(batch)
+        #kl_scheduler = self.kl_scheduler[current_epoch]
+        #kl_loss = kl_scheduler * kl_loss
+        return x_hat, recon_loss, kl_loss

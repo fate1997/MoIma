@@ -32,15 +32,7 @@ class SeqFeaturizer(FeaturizerABC):
     
     def __repr__(self) -> str:
         return f"SeqFeaturizer(seq_len: {self.seq_len})"
-    
-    @property
-    def __dict__(self) -> dict:
-        return {
-            'charset': self.charset,
-            'seq_len': self.seq_len,
-            'vocab_size': self.vocab_size,
-        }
-    
+        
     def set_charset_dict(self):
         self.charset_dict =  {c: i for i, c in enumerate(self.charset)}
     
@@ -63,8 +55,8 @@ class SeqFeaturizer(FeaturizerABC):
             smiles = smiles[:self.seq_len - 2]
             warnings.warn(f"SMILES string {smiles} is longer than the maximum.")
 
-        smiles = f"{self.SOS}{smiles}{self.EOS}"
-        paded_smiles = smiles.ljust(self.seq_len, self.PAD)
+        revised_smiles = f"{self.SOS}{smiles}{self.EOS}"
+        paded_smiles = revised_smiles.ljust(self.seq_len, self.PAD)
         seq = list(map(lambda x: self.charset_dict[x], paded_smiles))
         seq = torch.tensor(seq, dtype=torch.long)
         return SeqData(seq, smiles)

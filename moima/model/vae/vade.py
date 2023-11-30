@@ -88,8 +88,8 @@ class VaDE(nn.Module):
 
         L_rec/=L
 
-        Loss=L_rec*batch.x.size(1)
-
+        recon_loss = L_rec*batch.x.size(1)
+        Loss = L_rec*batch.x.size(1)
         pi=self.pi_
         log_sigma2_c=self.logvar_c
         mu_c=self.mu_c
@@ -98,6 +98,8 @@ class VaDE(nn.Module):
         yita_c=torch.exp(torch.log(pi.unsqueeze(0))+self.gaussian_pdfs_log(z,mu_c,log_sigma2_c))+det
 
         yita_c=yita_c/(yita_c.sum(1).view(-1,1))#batch_size*Clusters
+        
+        self.yita_c=yita_c
 
         Loss+=0.5*torch.mean(torch.sum(yita_c*torch.sum(log_sigma2_c.unsqueeze(0)+
                                                 torch.exp(z_sigma2_log.unsqueeze(1)-log_sigma2_c.unsqueeze(0))+
@@ -105,7 +107,7 @@ class VaDE(nn.Module):
 
         Loss-=torch.mean(torch.sum(yita_c*torch.log(pi.unsqueeze(0)/(yita_c)),1))+0.5*torch.mean(torch.sum(1+z_sigma2_log,1))
 
-        return x_hat, Loss    
+        return x_hat, recon_loss, Loss - recon_loss
     
     def gaussian_pdfs_log(self,x,mus,log_sigma2s):
         G=[]
