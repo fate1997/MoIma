@@ -1,8 +1,11 @@
 import warnings
 from typing import Any, List
+import pickle
 
 import torch
 from rdkit import Chem
+from tqdm import tqdm
+from copy import deepcopy
 
 from moima.dataset._abc import FeaturizerABC
 from moima.dataset.smiles_seq.data import SeqData
@@ -46,6 +49,7 @@ class SeqFeaturizer(FeaturizerABC):
     
     def __call__(self, smiles: str) -> SeqData:
         """Featurize a SMILES string into a sequence."""
+        smiles_copy = deepcopy(smiles)
         # Replace double tokens to single tokens
         for k, v in self.DOUBLE_TOKEN_DICT.items():
             smiles = smiles.replace(k, v)
@@ -59,9 +63,10 @@ class SeqFeaturizer(FeaturizerABC):
         paded_smiles = revised_smiles.ljust(self.seq_len, self.PAD)
         seq = list(map(lambda x: self.charset_dict[x], paded_smiles))
         seq = torch.tensor(seq, dtype=torch.long)
-        return SeqData(seq, smiles)
+        seq_len = torch.tensor(len(revised_smiles), dtype=torch.long)
+        return SeqData(seq, seq_len, smiles_copy)
     
-    def reload_charset(self, smiles_list: List[str]) -> List[str]:
+    def reload_charset(self, smiles_list: List[str]):
         r"""Reload the charset by the given list of SMILES strings.
         
         Args:
@@ -71,7 +76,7 @@ class SeqFeaturizer(FeaturizerABC):
             A list of uniqe characters in the SMILES strings.
         """
         s = set()
-        for smiles in smiles_list:
+        for smiles in tqdm(smiles_list, desc='Update vocabulary'):
             smiles = Chem.CanonSmiles(smiles)
             # Replace double tokens to single tokens
             for k, v in self.DOUBLE_TOKEN_DICT.items():
@@ -82,6 +87,16 @@ class SeqFeaturizer(FeaturizerABC):
         charset = [self.PAD, self.SOS, self.EOS] + charset
         self.charset = charset
         self.set_charset_dict()
+    
+    def load_vocab(self, file_path: str):
+        with open(file_path, 'rb') as f:
+            charset = pickle.load(f)
+        self.charset = charset
+        self.set_charset_dict()
+    
+    def save_vocab(self, file_path: str):
+        with open(file_path, 'wb') as f:
+            pickle.dump(self.charset, f)    
     
     def decode(self, x: torch.Tensor, is_raw: bool=True) -> List[str]:
         r"""Decode SMILES encodings into a SMILES list.

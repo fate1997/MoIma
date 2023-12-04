@@ -3,11 +3,13 @@ from .vae.vade import VaDE
 from torch import nn
 from typing import Literal, List
 from dataclasses import Field
+from .modules import MLP
 
 
 MODEL_REGISTRY = {
     "chemical_vae": ChemicalVAE,
     "vade": VaDE,
+    "mlp": MLP,
 }
 
 

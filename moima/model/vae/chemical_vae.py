@@ -1,8 +1,9 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from moima.model.vae.encoders import GRUEncoder
+
 from moima.model.vae.decoders import GRUDecoder
+from moima.model.vae.encoders import GRUEncoder
 
 
 class ChemicalVAE(nn.Module):
@@ -32,9 +33,16 @@ class ChemicalVAE(nn.Module):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return mu + eps * std
+    
+    def get_repr(self, batch):
+        self.eval()
+        seq, seq_len = batch.x, batch.seq_len
+        hidden = self.encoder(seq, seq_len)
+        mu = self.h2mu(hidden)
+        return mu
 
-    def forward(self, seq: torch.Tensor, seq_len: torch.Tensor):
-
+    def forward(self, batch):
+        seq, seq_len = batch.x, batch.seq_len
         hidden = self.encoder(seq, seq_len)
         mu, logvar = self.h2mu(hidden), self.h2logvar(hidden)
         z = self.reparameterize(mu, logvar)
@@ -56,13 +64,3 @@ def weight_init(m):
         
     elif isinstance(m, nn.Embedding):
         nn.init.constant_(m.weight, 1)
-
-
-if __name__ == '__main__':
-    vocab_size = 41
-    input_seq = torch.randint(0, vocab_size, (5, 120))
-    input_seq_len = torch.randint(1, 120, (5,))
-    # Test ChemicalVAE
-    model = ChemicalVAE(vocab_size=vocab_size)
-    output = model(input_seq, input_seq_len)
-    print(f"ChemicalVAE output shape: {output[0].shape}")

@@ -9,16 +9,28 @@ import os
 import itertools
 import numpy as np
 import torch.nn.functional as F
+from typing import Any, Dict
+import warnings
 
 
 class VaDEPipe(PipeABC):
-    def __init__(self, config: VaDEPipeConfig):
-        super().__init__(config)
+    def __init__(self, 
+                 config: VaDEPipeConfig,
+                 model_state_dict: Dict[str, Any] = None,
+                 optimizer_state_dict: Dict[str, Any] = None,
+                 **kwargs):
+        super().__init__(config, model_state_dict, optimizer_state_dict, **kwargs)
+        self.current_epoch = 0
+        if self.config.anneal_num_epochs != self.config.num_epochs:
+            warnings.warn('The anneal_num_epochs is not equal to num_epochs, '
+                            'the anneal_num_epochs will be set to num_epochs.')
+            self.config.anneal_num_epochs = self.config.num_epochs
     
     def _forward_batch(self, batch):
         batch.to(self.device)
+        self.model.to(self.device)
         x_hat, recon_loss, kl_loss = self.loss_fn(batch, self.model, self.current_epoch)
-        self.info = {'Reconstruction': recon_loss.item(), 
+        self.info = {'Recon loss': recon_loss.item(), 
                      'KL': kl_loss.item(),
                      'gamma_c': f'{self.model.yita_c.min().item()}~{self.model.yita_c.max().item()}'}
         return x_hat, recon_loss + kl_loss
@@ -35,29 +47,30 @@ class VaDEPipe(PipeABC):
         return {'featurizer': self.featurizer}
     
     def pretrain(self, pre_epoch=50, retrain=False):
-        self.load_dataset()
         dataloader = self.train_loader
-        self.load_model()
-        pretrained_path = os.path.join(self.config.output_folder, f'vade_pretrain_{self.config.desc}.wght')
+        pretrained_path = os.path.join(self.config.output_folder, 
+                                       f'vade_pretrain_{self.config.desc}.wght')
+        
         if (not os.path.exists(pretrained_path)) or retrain==True:
-            optimizer = torch.optim.Adam(itertools.chain(self.model.encoder.parameters(),\
+            optimizer = torch.optim.Adam(itertools.chain(
+                self.model.encoder.parameters(),\
                 self.model.h2mu.parameters(),\
-                    self.model.h2logvar.parameters(),\
-                        self.model.decoder.parameters()))
+                self.model.h2logvar.parameters(),\
+                self.model.decoder.parameters()))
 
             self.logger.info('Pretrain the VaDE'.center(60,'-'))
             self.model.train()
             n_iter = 0
             for epoch in range(pre_epoch):
-                self.current_epoch = epoch
                 for batch in dataloader:
                     optimizer.zero_grad()
                     batch.to(self.device)
                     seq, seq_len = batch.x, batch.seq_len
-                    x_hat, mu, logvar = self.model(seq, seq_len, is_pretrain=True)
+                    x_hat, mu, logvar = self.model(batch, is_pretrain=True)
                     recon_loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
                                     seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
                                     ignore_index=0)
+                    recon_loss = recon_loss*seq.size(1)
                     recon_loss.backward()
                     optimizer.step()
                     n_iter += 1
@@ -70,8 +83,7 @@ class VaDEPipe(PipeABC):
             with torch.no_grad():
                 for batch in dataloader:
                     batch.to(self.device)
-
-                    x_hat, mu, logvar = self.model(batch.x, batch.seq_len, is_pretrain=True)
+                    x_hat, mu, logvar = self.model(batch, is_pretrain=True)
                     assert F.mse_loss(mu, logvar) == 0
                     Z.append(mu)
 
@@ -98,12 +110,21 @@ class VaDEPipe(PipeABC):
             pad_idx = featurizer.charset_dict[featurizer.PAD]      
             max_len = featurizer.seq_len
             
-            center = 5
-            mu_c = model.mu_c[center]
-            logvar_c = model.logvar_c[center]
-            std = torch.exp(0.5 * logvar_c)
-            eps = torch.randn_like(std.repeat(num_samples, 1))
-            z = mu_c + eps * std
+            if center is None:
+                centers = np.random.choice(self.config.n_clusters, 
+                                           size=num_samples, 
+                                           p=torch.softmax(self.model.pi_.detach().cpu(), dim=0).numpy())
+                mu_c = self.model.mu_c[centers]
+                logvar_c = self.model.logvar_c[centers]
+                std = torch.exp(0.5 * logvar_c)
+                eps = torch.randn_like(std)
+                z = mu_c + eps * std
+            else:
+                mu_c = model.mu_c[center]
+                logvar_c = model.logvar_c[center]
+                std = torch.exp(0.5 * logvar_c)
+                eps = torch.randn_like(std.repeat(num_samples, 1))
+                z = mu_c + eps * std
             
             if num_samples == 1:
                 z_0 = z.view(1, 1, -1) 
@@ -117,7 +138,7 @@ class VaDEPipe(PipeABC):
             x[:, 0] = sos_idx
             
             eos_p = torch.tensor(max_len).repeat(num_samples)
-            eos_m = torch.zeros(num_samples, dtype=torch.uint8)
+            eos_m = torch.zeros(num_samples, dtype=torch.bool)
             
             # sequence part
             for i in range(1, max_len):

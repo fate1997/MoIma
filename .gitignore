@@ -4,6 +4,7 @@ output/
 Reference/
 example/
 .pretrain
+result/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

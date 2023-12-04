@@ -3,10 +3,15 @@ from typing import List, Literal
 from ._abc import LossCalcABC
 from .vae_loss import VAELossCalc
 from .vade_loss import VaDELossCalc
+from torch import nn
+
 
 LOSS_FN_REGISTRY = {
     "vae_loss": VAELossCalc,
     "vade_loss": VaDELossCalc,
+    "mse": nn.MSELoss,
+    "l1": nn.L1Loss,
+    "huber": nn.SmoothL1Loss,
 }
 
 

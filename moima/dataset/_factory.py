@@ -1,10 +1,14 @@
 from ._abc import DatasetABC
-from .smiles_seq.dataset import SMILESSeq, SeqFeaturizer
+from .smiles_seq.dataset import SMILESSeq
+from .smiles_seq.featurizer import SeqFeaturizer
+from .descriptor_vec.dataset import DescDataset
+from .descriptor_vec.featurizer import DescFeaturizer
 from typing import List, Literal
 
 
 DATASET_REGISTRY = {
-    "smiles_seq": (SMILESSeq, SeqFeaturizer)
+    "smiles_seq": (SMILESSeq, SeqFeaturizer),
+    "desc_vec": (DescDataset, DescFeaturizer)
 }
 
 

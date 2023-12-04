@@ -6,14 +6,19 @@ from tqdm import tqdm
 from moima.pipeline.vae.config import VAEPipeConfig
 from moima.pipeline.pipe import PipeABC
 
+from typing import Any, Dict
+
 
 class VAEPipe(PipeABC):
-    def __init__(self, config: VAEPipeConfig):
-        super().__init__(config)
+    def __init__(self, config: VAEPipeConfig, 
+                 model_state_dict: Dict[str, Any] = None,
+                 optimizer_state_dict: Dict[str, Any] = None,
+                 **kwargs):
+        super().__init__(config, model_state_dict, optimizer_state_dict, **kwargs)
     
     def _forward_batch(self, batch):
         batch.to(self.device)
-        mu, logvar, x_hat = self.model(batch.x, batch.seq_len)
+        mu, logvar, x_hat = self.model(batch)
         loss = self.loss_fn(batch, mu, logvar, x_hat, self.current_epoch)
         return x_hat, loss
     
@@ -50,7 +55,7 @@ class VAEPipe(PipeABC):
             x[:, 0] = sos_idx
             
             eos_p = torch.tensor(max_len).repeat(num_samples)
-            eos_m = torch.zeros(num_samples, dtype=torch.uint8)
+            eos_m = torch.zeros(num_samples, dtype=torch.bool)
             
             # sequence part
             for i in range(1, max_len):

@@ -7,19 +7,19 @@ class VaDELossCalc:
     def __init__(self, 
                  start_kl_weight: float = 0.0001,
                  end_kl_weight: float = 0.0025,
-                 num_epochs: int = 100,
+                 anneal_num_epochs: int = 100,
                  n_cycles: int = 5,
                  ratio: float = 0.7,
                  start_center_weight: float = 0.00001,
                  end_center_weight: float = 1e7):
         self.kl_scheduler = self.loss_annealing(start_kl_weight, 
                                                 end_kl_weight, 
-                                                num_epochs, 
+                                                anneal_num_epochs, 
                                                 n_cycles, 
                                                 ratio)
         self.center_scheduler = self.loss_annealing(start_center_weight,
                                                     end_center_weight,
-                                                    num_epochs,
+                                                    anneal_num_epochs,
                                                     n_cycles,
                                                     ratio)
     
@@ -44,6 +44,6 @@ class VaDELossCalc:
             
     def __call__(self, batch, model, current_epoch):
         x_hat, recon_loss, kl_loss = model.ELBO_Loss(batch)
-        #kl_scheduler = self.kl_scheduler[current_epoch]
-        #kl_loss = kl_scheduler * kl_loss
+        kl_scheduler = self.kl_scheduler[current_epoch]
+        kl_loss = kl_scheduler * kl_loss
         return x_hat, recon_loss, kl_loss

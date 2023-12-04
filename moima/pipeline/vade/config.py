@@ -12,6 +12,11 @@ class VaDEPipeConfig(DefaultConfig):
                             metadata={'help': 'The sequence length.',
                                       'type': ArgType.FEATURZIER})
     
+    # Dataset
+    vocab_path: str = field(default=None,
+                                metadata={'help': 'The path to the vocabulary.',
+                                          'type': ArgType.DATASET})
+    
     # Model
     model_name: str = field(default='vade',
                             metadata={'help': 'The model name.',
@@ -34,6 +39,9 @@ class VaDEPipeConfig(DefaultConfig):
     dropout: float = field(default=0.1,
                             metadata={'help': 'The dropout rate.',
                                       'type': ArgType.MODEL})
+    n_clusters: int = field(default=10,
+                            metadata={'help': 'The number of clusters.',
+                                      'type': ArgType.MODEL})
     
     # Loss_fn
     end_kl_weight: float = field(default=0.0025,
@@ -45,5 +53,8 @@ class VaDEPipeConfig(DefaultConfig):
     loss_fn_name: str = field(default='vade_loss',
                             metadata={'help': 'The loss function name.',
                                       'type': ArgType.LOSS_FN})
+    anneal_num_epochs: int = field(default=100,
+                                    metadata={'help': 'The number of epochs to anneal.',
+                                            'type': ArgType.LOSS_FN})
     
     

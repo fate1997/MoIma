@@ -10,11 +10,12 @@ from tqdm import tqdm
 
 from moima.pipeline.config import DefaultConfig
 from moima.dataset import DatasetFactory, FeaturizerFactory
-from moima.dataset._abc import DataABC
+from moima.dataset._abc import DataABC, DatasetABC
 from moima.model import ModelFactory
 from moima.utils._util import get_logger
 from moima.utils.loss_fn import LossCalcFactory
 from moima.utils.splitter import SplitterFactory
+from moima.utils.splitter._abc import SplitterABC
 
 
 class PipeABC(ABC):
@@ -23,18 +24,33 @@ class PipeABC(ABC):
                          'optimizer_state_dict', 
                          'config']
     
-    def __init__(self, config: DefaultConfig):
+    def __init__(self, 
+                 config: DefaultConfig,
+                 model_state_dict: Dict[str, Any] = None,
+                 optimizer_state_dict: Dict[str, Any] = None,
+                 **kwargs):
         self.config = config
+        self.config.to_yaml(os.path.join(self.workspace, 'config.yaml'))
         
         self.device =  self.config.device
         self.n_epoch =  self.config.num_epochs
         
-        self.logger = get_logger(f'{self.config.desc}'+'.log', 
-                                 os.path.join( self.config.output_folder, 'logs/'))
+        self.logger = get_logger(f'pipe.log', 
+                                 os.path.join(self.workspace))
                 
         self.loss_fn = LossCalcFactory.create(**self.config.loss_fn)
-        self.featurizer = FeaturizerFactory.create(**self.config.featurizer)
+        self.build_featurizer()
+        self.build_loader()
+        self.build_model()
+        if model_state_dict is not None:
+            self.model.load_state_dict(model_state_dict)
+            
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.lr)
+        if optimizer_state_dict is not None:
+            self.optimizer.load_state_dict(optimizer_state_dict)
+        
+        for key, value in kwargs.items():
+            setattr(self, key, value)
         self.training_trace = {}
        
     @abstractmethod
@@ -44,25 +60,46 @@ class PipeABC(ABC):
     @abstractmethod
     def _interested_info(self, batch: DataABC, output: torch.Tensor) -> Dict[str, Any]:
         """Get the interested information."""
-    
+        
     @abstractproperty
     def custom_saveitems(self) -> Dict[str, Any]:
         """The items that will be saved besides `DEFAULT_SAVEITEMS."""
+        
+    @property
+    def workspace(self) -> str:
+        """The workspace of the pipeline."""
+        folder = f'{self.__class__.__name__}_{self.config.desc}_{self.config.hash_key}'
+        work_dir = os.path.join(self.config.output_folder, folder)
+        if not os.path.exists(work_dir):
+            os.makedirs(work_dir)
+        return work_dir
     
-    def load_dataset(self):
+    def build_featurizer(self):
+        """Build the featurizer."""
+        featurizer_config = self.config.featurizer
+        self.featurizer = FeaturizerFactory.create(**featurizer_config)
+    
+    def build_dataset(self) -> DatasetABC:
         """Load the dataset."""
         self.logger.info("Dataset Loading".center(60, "-"))
         dataset_kwargs = self.config.dataset
         dataset_kwargs.update({'featurizer': self.featurizer})
         dataset = DatasetFactory.create(**dataset_kwargs)
-        splitter = SplitterFactory.create(**self.config.splitter)
-        train_loader, val_loader, test_loader = splitter(dataset)
         self.featurizer = dataset.featurizer
+        return dataset
+    
+    def build_splitter(self) -> SplitterABC:
+        return SplitterFactory.create(**self.config.splitter)
+    
+    def build_loader(self):
+        dataset = self.build_dataset()
+        splitter = self.build_splitter()
+        train_loader, val_loader, test_loader = splitter(dataset)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
     
-    def load_model(self):
+    def build_model(self):
         """Load the model."""
         self.logger.info("Model Loading".center(60, "-"))
         model_config = self.config.model
@@ -72,14 +109,39 @@ class PipeABC(ABC):
                 model_config[key] = featurizer_value
         self.model = ModelFactory.create(**model_config).to(self.device)
     
+    def get_loader(self, split: str='val'):
+        """Get the loader."""
+        if split == 'train':
+            return self.train_loader
+        elif split == 'val':
+            return self.val_loader
+        elif split == 'test':
+            return self.test_loader
+        else:
+            raise ValueError(f"Split {split} is not supported.")
+    
+    def batch_flatten(self, split: str='val'):
+        self.model.eval()
+        loader = self.get_loader(split)
+        labels = []
+        outputs = []
+        for batch in loader:
+            output, _ = self._forward_batch(batch)
+            labels.append(batch.y)
+            outputs.append(output)
+        labels = torch.cat(labels, dim=0)
+        outputs = torch.cat(outputs, dim=0)
+        return labels, outputs
+    
     def train(self):
         """Train the model."""
         self.logger.info(f"{repr(self.config)}")
         if 'train_loader' not in self.__dict__:
-            self.load_dataset()
+            self.build_loader()
         if 'model' not in self.__dict__:
-            self.load_model()
+            self.build_model()
         
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.lr)
         self.logger.info("Training".center(60, "-"))
         self.model.train()
         n_epoch = self.config.num_epochs
@@ -119,15 +181,12 @@ class PipeABC(ABC):
         time_elapsed = (time.time() - starting_time) / 60
         self.logger.info(f"Training finished in {time_elapsed:.2f} minutes")
     
-    def load_pretrained(self, path: str):
+    @classmethod
+    def from_pretrained(cls, path: str):
         """Load the pretrained model."""
         results = torch.load(path)
-        self.config = results['config']
-        self.model.load_state_dict(results['model_state_dict'])
-        self.optimizer.load_state_dict(results['optimizer_state_dict'])
-        for key, value in self.custom_saveitems.items():
-            setattr(self, key, value)
-        self.logger.info(f"Pretrained model loaded from {path}")
+        print(f"Pretrained model loaded.")
+        return cls(**results)
     
     def save(self, **kwargs):
         """Save the necessary information to reproduce the pipeline."""
@@ -138,9 +197,13 @@ class PipeABC(ABC):
         }
         basic_info.update(kwargs)
         
+        ckpt_folder = os.path.join(self.workspace, 'ckpt')
+        if not os.path.exists(ckpt_folder):
+            os.makedirs(ckpt_folder)
+        
         time = datetime.now().strftime("%H-%M-%d-%m-%Y")
-        save_name = f'{self.__class__.__name__}_{self.config.desc}_{time}.pt'
-        save_path = os.path.join(self.config.output_folder, save_name)
+        save_name = f'epoch-{self.current_epoch}_{time}.pt'
+        save_path = os.path.join(ckpt_folder, save_name)
         
         torch.save(basic_info, save_path)
         self.logger.info(f"Pipeline saved to {save_path}")

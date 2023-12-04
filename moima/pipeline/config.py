@@ -2,6 +2,9 @@ import argparse
 from dataclasses import dataclass, field, Field
 from enum import Enum
 from typing import Any, Dict
+import json
+import yaml
+import hashlib
 
 from moima.dataset._factory import DATASET_REGISTRY
 from moima.model._factory import MODEL_REGISTRY
@@ -18,6 +21,8 @@ class ArgType(Enum):
     OPTIMIZER=5
     SCHEDULER=6
     GENERAL=7
+
+NAME_BAG = ['dataset', 'model', 'splitter', 'loss_fn']
 
 
 @dataclass
@@ -54,9 +59,12 @@ class DefaultConfig:
     seed: int = field(default=42,
                         metadata={'help': 'The random seed.',
                                 'type': ArgType.SPLITTER})
-    ratios: float = field(default=(0.8, 0.1),
-                                    metadata={'help': 'The train/val ratio.',
-                                            'type': ArgType.SPLITTER})
+    frac_train: float = field(default=0.8,
+                                metadata={'help': 'The ratio or the number of the training set.',
+                                        'type': ArgType.SPLITTER})
+    frac_val: float = field(default=0.1,
+                                metadata={'help': 'The ratio or the number of the validation set.',
+                                        'type': ArgType.SPLITTER})
     
     # Model
     model_name: str = field(default='chemical_vae',
@@ -103,6 +111,20 @@ class DefaultConfig:
                 v.default = input_value
     
     @property
+    def hash_key(self):
+        dhash = hashlib.md5()
+        encoded = json.dumps(self.__dict__, sort_keys=True).encode()
+        dhash.update(encoded)
+        return int(dhash.hexdigest(), 16) % (10 ** 8)
+    
+    @property
+    def group_dict(self):
+        dic = {}
+        for arg in ArgType:
+            dic[arg.name.lower()] = self.group(arg)
+        return dic
+    
+    @property
     def dataset(self):
         return self.group(ArgType.DATASET)
     
@@ -140,9 +162,13 @@ class DefaultConfig:
         """Group the config."""
         result_dict = {}
         for k, v in self.__dataclass_fields__.items():
-            k = 'name' if 'name' in k else k
             if v.metadata['type'] == type:
-                result_dict[k] = v.default
+                if v.default != getattr(self, k):
+                    result_dict[k] = getattr(self, k)
+                else:
+                    result_dict[k] = v.default
+                if 'name' in k:
+                    result_dict['name'] = result_dict.pop(k)
         return result_dict
         
     def __add__(self, other: 'DefaultConfig'):
@@ -156,11 +182,43 @@ class DefaultConfig:
                 raise ValueError(f'Key {k} already exists.')
         return self.from_dict(**this_dict)
     
-    @classmethod
-    def from_dict(cls, **kwargs) -> 'DefaultConfig':
-        """Create a config from a dictionary."""
-        raise cls(**kwargs)
+    def to_json(self, save_path: str):
+        """Save the config to a json file."""
+        assert save_path.endswith('.json'), 'The save path must end with .json'
+        with open(save_path, 'w') as f:
+            json.dump(self.group_dict, f)
+
+    def to_yaml(self, save_path: str):
+        """Save the config to a yaml file."""
+        assert save_path.endswith('.yaml'), 'The save path must end with .yaml'
+        with open(save_path, 'w') as f:
+            yaml.dump(self.group_dict, f, indent=4, sort_keys=False)
     
+    @classmethod
+    def from_file(cls, file_path: str):
+        """Create a config from a file."""
+        assert file_path.endswith('.json') or file_path.endswith('.yaml'), \
+            'The file path must end with .json or .yaml'
+        with open(file_path, 'r') as f:
+            if file_path.endswith('.json'):
+                dic = json.load(f)
+            else:
+                dic = yaml.load(f, Loader=yaml.FullLoader)
+        dic = cls._group_dict2dict(dic)
+        return cls(**dic)
+    
+    @staticmethod
+    def _group_dict2dict(group_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert a group dict to a dict."""
+        result_dict = {}
+        for k, v in group_dict.items():
+            for kk, vv in v.items():
+                if k in NAME_BAG and kk == 'name':
+                    result_dict[f'{k}_name'] = vv
+                else:
+                    result_dict[kk] = vv
+        return result_dict
+        
     @classmethod
     def from_args(cls) -> 'DefaultConfig':
         parser =  argparse.ArgumentParser(description='Parser For Arguments', 
