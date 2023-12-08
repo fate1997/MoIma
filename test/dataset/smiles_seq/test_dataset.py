@@ -65,3 +65,7 @@ def test_dataset(zinc1k, helpers):
     assert hasattr(batch, 'qed')
     assert batch.logP.shape == (2, )
     assert batch.qed.shape == (2, )
+    
+    assert isinstance(batch[0], SeqData)
+    assert hasattr(batch[0], 'logP')
+    assert hasattr(batch[0], 'qed')
