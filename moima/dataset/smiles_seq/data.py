@@ -34,7 +34,7 @@ class SeqBatch:
         return f"SeqBatch(shape of x: {self.x.shape})"
     
     def __getitem__(self, index: int) -> SeqData:
-        return SeqData(self.x[index], self.smiles[index])
+        return SeqData(self.x[index], self.seq_len[index], self.smiles[index])
     
     def to(self, device: torch.device) -> 'SeqBatch':
         self.x = self.x.to(device)

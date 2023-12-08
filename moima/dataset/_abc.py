@@ -1,18 +1,18 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Union, List
+from typing import List
 
-import torch
-from torch_geometric.data import Dataset
 import numpy as np
 import pandas as pd
+import torch
+from torch_geometric.data import Dataset
+from tqdm import tqdm
 
-
-IndexType = Union[slice, torch.Tensor, np.ndarray, List[int]]
+from moima.typing import LabelType, MolRepr
 
 
 class DataABC(ABC):
-    """Data abstract base class."""
+    r"""Data abstract class."""
     
     @abstractmethod
     def __len__(self):
@@ -24,75 +24,96 @@ class DataABC(ABC):
 
 
 class FeaturizerABC(ABC):
-    """Featurizer abstract base class."""
-    
-    @abstractmethod
-    def __call__(self, smiles: str, labels: Any = None) -> DataABC:
-        """Featurize the input raw data to `BaseData`."""
-    
+    r"""Featurizer abstract class."""
+        
     @abstractmethod
     def __repr__(self) -> str:
         """Return the representation of the featurizer."""
     
-    @property
-    @abstractmethod
-    def input_args(self):
-        """Return the input arguments of the featurizer."""
+    def __call__(self, 
+                 mol_list: List[MolRepr],
+                 **kwargs) -> List[DataABC]:
+        """Featurize a batch of SMILES.
+        
+        Args:
+            mol_list: A list of SMILES.
+            **kwargs: Other features. The key is the name of the feature, and 
+                the value is a list of the feature. The length of the list should
+                be the same as that of `mol_list`.
+        
+        Returns:
+            A list of Data.
+        """
+        data_list = []
+        for i, mol in tqdm(enumerate(mol_list), 'Featurization'):
+            data = self.encode(mol)
+            for key, value in kwargs.items():
+                assign_value = value[i]
+                if not isinstance(value[i], str):
+                    assign_value = torch.tensor(value[i])
+                setattr(data, key, assign_value)
+            data_list.append(data)
+        return data_list        
     
-    @classmethod
-    def from_dict(cls, **kwargs) -> 'FeaturizerABC':
-        """Create a featurizer from a dictionary."""
-        return cls(**kwargs)
-
+    @abstractmethod
+    def encode(self, mol: MolRepr, labels: LabelType=None) -> DataABC:
+        """Featurize the input raw data to Data."""
 
 class DatasetABC(Dataset):
-    """Dataset abstract base class."""
+    r"""Dataset abstract base class.
+    
+    Args:
+        raw_path (str): The path to the raw data.
+        featurizer_cls (FeaturizerABC): The featurizer class.
+        featurizer_kwargs (dict): The keyword arguments for the featurizer. 
+            (default: :obj:`None`)
+        processed_path (str): The path to the processed data. If None, the
+            processed data will be saved to the same directory as `raw_path`, 
+            and end with '.pt'. (default: :obj:`None`)
+        force_reload (bool): Whether to force reload the processed data. (default:
+            :obj:`False`)
+        save_processed (bool): Whether to save the processed data. (default:
+            :obj:`False`)
+    """
     
     def __init__(self,
                  raw_path: str,
-                 featurizer: FeaturizerABC,
-                 processed_path: str = None,
-                 force_reload: bool = False,
-                 save_processed: bool = False,
-                 **kwargs):
+                 featurizer_cls: FeaturizerABC,
+                 featurizer_kwargs: dict=None,
+                 processed_path: str=None,
+                 force_reload: bool=False,
+                 save_processed: bool=False):
         super().__init__()
-        
         self.raw_path = raw_path
+        self.featurizer = featurizer_cls(**featurizer_kwargs)
         self.force_reload = force_reload
         self.save_processed = save_processed
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-        
-        self.featurizer = featurizer
         
         if processed_path is None:
             processed_path = os.path.splitext(raw_path)[0] + '.pt'
         
         if os.path.exists(processed_path) and not force_reload:
-            processed_dataset = torch.load(processed_path)
-            self.data_list = processed_dataset['data_list']
-            featurizer_dict = processed_dataset['featurizer']
-            
+            self.data_list = torch.load(processed_path)
         else:
-            self.data_list, featurizer_dict = self._prepare_data()
+            self.data_list = self.prepare()
 
         if save_processed:
-            torch.save({'data_list': self.data_list,  
-                        'featurizer': featurizer_dict}, processed_path)
+            torch.save(self.data_list, processed_path)
     
     def __repr__(self) -> str:
+        r"""Return the representation of the dataset."""
         return self.__class__.__name__ + f'(Number of data: {len(self)})'
     
     @abstractmethod
-    def _prepare_data(self):
-        """Prepare data for the dataset."""
+    def prepare(self):
+        r"""Prepare data for the dataset."""
         
     def get(self, idx: int) -> DataABC:
-        """Gets the data object at index `idx`."""
+        r"""Gets the data object at index `idx`."""
         return self.data_list[idx]
     
     def _get_smiles_column(self, df: pd.DataFrame) -> str:
-        """Return the column containing SMILES."""
+        r"""Return the column containing SMILES."""
         smiles_col = None
         lower_columns = [c.lower() for c in df.columns]
         for i, column in enumerate(lower_columns):
@@ -107,10 +128,10 @@ class DatasetABC(Dataset):
         return smiles_col
     
     def len(self) -> int:
-        """Return the length of the dataset."""
+        r"""Return the length of the dataset."""
         return len(self.data_list)
     
     def random_shuffle(self, seed: int = 42):
-        """Randomly shuffle the dataset."""
+        r"""Randomly shuffle the dataset."""
         np.random.seed(seed)
         np.random.shuffle(self.data_list)

@@ -5,6 +5,7 @@ Reference/
 example/
 .pretrain
 result/
+.pytest_temp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

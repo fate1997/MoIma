@@ -1,14 +1,12 @@
-from ._abc import DatasetABC
-from .smiles_seq.dataset import SMILESSeq
-from .smiles_seq.featurizer import SeqFeaturizer
-from .descriptor_vec.dataset import DescDataset
-from .descriptor_vec.featurizer import DescFeaturizer
-from typing import List, Literal
+from typing import List
 
+from ._abc import DatasetABC
+from .descriptor_vec.dataset import DescDataset
+from .smiles_seq.dataset import SeqDataset
 
 DATASET_REGISTRY = {
-    "smiles_seq": (SMILESSeq, SeqFeaturizer),
-    "desc_vec": (DescDataset, DescFeaturizer)
+    "smiles_seq": SeqDataset,
+    "desc_vec": DescDataset,
 }
 
 
@@ -34,29 +32,4 @@ class DatasetFactory:
     @property
     def avail(self) -> List[str]:
         """List of available datasets."""
-        return list(DATASET_REGISTRY.keys())
-
-
-class FeaturizerFactory:
-    """Factory class for featurizer."""
-    
-    @staticmethod
-    def create(**kwargs):
-        """Create a featurizer instance by name.
-        
-        Args:
-            name (str): Name of the featurizer.
-            **kwargs: Arguments for the featurizer.
-        
-        Returns:
-            A featurizer instance.
-        """
-        name = kwargs.pop('name')
-        if name not in DATASET_REGISTRY:
-            raise ValueError(f"Featurizer {name} is not available.")
-        return DATASET_REGISTRY[name][1](**kwargs)
-    
-    @property
-    def avail(self) -> List[str]:
-        """List of available featurizers."""
         return list(DATASET_REGISTRY.keys())
