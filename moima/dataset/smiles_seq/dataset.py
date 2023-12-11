@@ -70,6 +70,7 @@ class SeqDataset(DatasetABC):
             self.featurizer.save_vocab(vocab_path)
         
         # Extract additional columns
+        print(self.additional_cols)
         additional_kwargs = dict(zip(self.additional_cols,
                                      df[self.additional_cols].values.T))
 

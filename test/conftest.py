@@ -28,3 +28,8 @@ def helpers():
 @pytest.fixture(scope="session")
 def zinc1k():
     return os.path.join(pytest.EXAMPLE_PATH, "zinc1k.csv")
+
+
+@pytest.fixture(scope="session")
+def smiles_batch():
+    return ["CC(=O)OC1=CC=CC=C1C(=O)O", "CCO", "CC(=O)O"]

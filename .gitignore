@@ -2,7 +2,7 @@
 output/
 *debug.ipynb
 Reference/
-example/
+/example/
 .pretrain
 result/
 .pytest_temp/

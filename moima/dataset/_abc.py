@@ -47,6 +47,8 @@ class FeaturizerABC(ABC):
         data_list = []
         for i, mol in tqdm(enumerate(mol_list), 'Featurization'):
             data = self.encode(mol)
+            if data is None:
+                continue            
             for key, value in kwargs.items():
                 assign_value = value[i]
                 if not isinstance(value[i], str):
@@ -56,7 +58,7 @@ class FeaturizerABC(ABC):
         return data_list        
     
     @abstractmethod
-    def encode(self, mol: MolRepr, labels: LabelType=None) -> DataABC:
+    def encode(self, mol: MolRepr) -> DataABC:
         """Featurize the input raw data to Data."""
 
 class DatasetABC(Dataset):
