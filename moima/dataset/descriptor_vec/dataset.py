@@ -12,7 +12,7 @@ class DescDataset(DatasetABC):
     def __init__(self, 
                  raw_path: str, 
                  label_col: Union[str, List[str]],
-                 additional_cols: List[str] = None,
+                 additional_cols: List[str] = [],
                  featurizer_kwargs: dict=None, 
                  processed_path: str = None, 
                  force_reload: bool = False, 

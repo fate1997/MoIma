@@ -45,7 +45,7 @@ class FeaturizerABC(ABC):
             A list of Data.
         """
         data_list = []
-        for i, mol in tqdm(enumerate(mol_list), 'Featurization'):
+        for i, mol in enumerate(tqdm(mol_list, 'Featurization')):
             data = self.encode(mol)
             if data is None:
                 continue            
