@@ -7,7 +7,7 @@
 - [ ] self.training_trace
 - [ ] vocab size should be inherited from the dataset
 - [ ] using workdir as output dir
-- [ ] merge featurizer arguments into dataset?
+- [x] merge featurizer arguments into dataset?
 
 
 2023-11-20

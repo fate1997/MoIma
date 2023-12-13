@@ -29,7 +29,7 @@ class VecBatch:
         self.smiles = smiles
             
     def __repr__(self) -> str:
-        return f"SeqBatch(shape of x: {self.x.shape})"
+        return f"VecBatch(shape of x: {self.x.shape})"
     
     def __getitem__(self, index: int) -> VecData:
         return VecData(self.x[index], self.y[index], self.smiles[index])

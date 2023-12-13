@@ -19,6 +19,12 @@ class Helpers:
         for file in files:
             if os.path.exists(file):
                 os.remove(file)
+                
+class PipeStorage:
+    dataset = {}
+    model = {}
+    splitter = {}
+
 
 @pytest.fixture(scope="session")
 def helpers():
@@ -29,6 +35,9 @@ def helpers():
 def zinc1k():
     return os.path.join(pytest.EXAMPLE_PATH, "zinc1k.csv")
 
+@pytest.fixture(scope="session")
+def zinc100():
+    return os.path.join(pytest.EXAMPLE_PATH, "zinc100.csv")
 
 @pytest.fixture(scope="session")
 def smiles_batch():

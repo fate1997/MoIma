@@ -12,6 +12,7 @@ DATASET_REGISTRY = {
 
 class DatasetFactory:
     """Factory class for dataset."""
+    avail = list(DATASET_REGISTRY.keys())
         
     @staticmethod
     def create(**kwargs) -> DatasetABC:
@@ -28,8 +29,3 @@ class DatasetFactory:
         if name not in DATASET_REGISTRY:
             raise ValueError(f"Dataset {name} is not available.")
         return DATASET_REGISTRY[name](**kwargs)
-    
-    @property
-    def avail(self) -> List[str]:
-        """List of available datasets."""
-        return list(DATASET_REGISTRY.keys())

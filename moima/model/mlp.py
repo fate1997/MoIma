@@ -1,8 +1,20 @@
-from torch import nn
-from moima.model._util import get_activation
+from torch import nn, Tensor
+
+from moima.model._util import get_activation, init_weight
+from moima.dataset.descriptor_vec.data import VecBatch
 
 
 class MLP(nn.Module):
+    r"""Multi-layer perceptron.
+    
+    Args:
+        input_dim (int): Input dimension.
+        hidden_dim (int): Hidden dimension.
+        output_dim (int): Output dimension.
+        n_layers (int): Number of layers.
+        dropout (float): Dropout rate.
+        activation (str): Activation function.
+    """
     def __init__(self, 
                  input_dim: int, 
                  hidden_dim: int, 
@@ -29,17 +41,12 @@ class MLP(nn.Module):
         
         self.layers.apply(init_weight)
         
-    def forward(self, batch):
+    def forward(self, batch: VecBatch) -> Tensor:
+        r"""Forward pass of :class:`MLP`.
+
+        Args:
+            batch (VecBatch): Batch of data. The batch should contain :obj:`x`.         
+        """
         x = batch.x
         output = self.layers(x)
         return output
-
-
-def init_weight(m):
-    if isinstance(m, nn.Linear):
-        nn.init.xavier_uniform_(m.weight)
-        if m.bias != None:
-            nn.init.constant_(m.bias, 0)
-    elif isinstance(m, nn.LayerNorm):
-        nn.init.constant_(m.weight, 1)
-        nn.init.constant_(m.bias, 0)

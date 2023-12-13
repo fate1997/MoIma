@@ -1,17 +1,42 @@
+from typing import Tuple
+
 import numpy as np
 import torch
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
-from torch import nn
+from torch import Tensor, nn
 
-from .decoders import GRUDecoder
-from .encoders import GRUEncoder
+from moima.dataset.smiles_seq.data import SeqBatch
+from moima.model._util import init_weight
+from moima.model.vae.decoders import GRUDecoder
+from moima.model.vae.encoders import GRUEncoder
 
 
 class VaDE(nn.Module):
     """Variational Deep Embedding (VaDE) model. This implementation is referred to: 
         https://github.com/GuHongyang/VaDE-pytorch/blob/master/model.py, 
         https://github.com/zll17/Neural_Topic_Models/blob/6d8f0ce750393de35d3e0b03eae43ba39968bede/models/vade.py#L4
+    
+    Args:
+        vocab_size (int): Vocabulary size.
+        enc_hidden_dim (int): Encoder hidden dimension.
+        latent_dim (int): Latent dimension.
+        emb_dim (int): Embedding dimension.
+        dec_hidden_dim (int): Decoder hidden dimension.
+        n_clusters (int): Number of clusters.
+        dropout (float): Dropout rate.
+    
+    Structure:
+        * Encoder: [batch_size, seq_len] -> [batch_size, seq_len, enc_hidden_dim]
+        * Decoder: [batch_size, seq_len, latent_dim] -> [batch_size, seq_len, vocab_size]
+    
+    Additional Attributes:
+        * pi_ (nn.Parameter): Mixture weight.
+        * mu_c (nn.Parameter): Cluster mean.
+        * logvar_c (nn.Parameter): Cluster log variance.
+        * gmm (sklearn.mixture.GaussianMixture): Gaussian mixture model.
+        * n_clusters (int): Number of clusters.
+        * latent_dim (int): Latent dimension.
     """
     def __init__(self, 
                  vocab_size: int=35,
@@ -25,6 +50,7 @@ class VaDE(nn.Module):
         self.encoder = GRUEncoder(vocab_size, 
                                emb_dim, 
                                enc_hidden_dim, 
+                               latent_dim,
                                dropout)
         self.decoder = GRUDecoder(self.encoder.embedding, 
                                dropout, 
@@ -33,133 +59,100 @@ class VaDE(nn.Module):
                                vocab_size, 
                                emb_dim)
         
-        self.h2mu = nn.Linear(enc_hidden_dim, latent_dim)
-        self.h2logvar = nn.Linear(enc_hidden_dim, latent_dim)
-        
-        self.pi_=nn.Parameter(torch.FloatTensor(n_clusters,).fill_(1)/n_clusters, requires_grad=True)
+        # Additional parameters to define the Gaussian mixture model
+        self.pi_=nn.Parameter(torch.FloatTensor(n_clusters, ).fill_(1)/n_clusters, requires_grad=True)
         self.mu_c=nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
         self.logvar_c=nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
-        
-        self.gmm = GaussianMixture(n_components=n_clusters, 
-                                   covariance_type='diag')
+        self.gmm = GaussianMixture(n_components=n_clusters,  covariance_type='diag')
         self.n_clusters = n_clusters
         self.latent_dim = latent_dim
-        self.apply(weight_init)
+        
+        self.apply(init_weight)
     
-    @staticmethod
-    def predict(model, batch):
-        model.eval()
-        seq, seq_len = batch.x, batch.seq_len
-        hidden = model.encoder(seq, seq_len)
-        z, _ = model.h2mu(hidden), model.h2logvar(hidden)
-
-        pi = model.pi_
-        log_sigma2_c = model.logvar_c
-        mu_c = model.mu_c
-        yita_c = torch.exp(torch.log(pi.unsqueeze(0))+model.gaussian_pdfs_log(z,mu_c,log_sigma2_c))
-
+    
+    def predict(self, batch: SeqBatch) -> np.ndarray:
+        r"""Predict the cluster label of the input.
+        
+        Args:
+            model (VaDE): VaDE model.
+            batch (SeqBatch): Batch of data. The batch should contain :obj:`x` and :obj:`seq_len`.
+                The shape of :obj:`x` is :math:`[batch\_size, seq\_len]`. The shape of :obj:`seq_len`
+                is :math:`[batch\_size]`.
+        
+        Returns:
+            y_pred (np.ndarray): Cluster label of the input. The shape is :math:`[batch\_size]`.
+        """
+        self.eval()
+        z, _ = self.encoder(batch)
+        pi = self.pi_
+        logvar_c = self.logvar_c
+        mu_c = self.mu_c
+        yita_c = torch.exp(torch.log(pi.unsqueeze(0))+
+                           self.gaussian_pdfs_log(z, mu_c, logvar_c))
         yita=yita_c.detach().cpu().numpy()
         return np.argmax(yita,axis=1)
 
-        
-    def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor):
+    def reparameterize(self, mu: Tensor, logvar: Tensor):
+        r"""Reparameterization trick. """
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return mu + eps * std
     
-    def get_repr(self, batch):
-        seq, seq_len = batch.x, batch.seq_len
-        with torch.no_grad():
-            hidden = self.encoder(seq, seq_len)
-            mu = self.h2mu(hidden)
-            return mu
+    def get_repr(self, batch: SeqBatch) -> Tensor:
+        r"""Get the latent representation of the input."""
+        self.eval()
+        mu, _ = self.encoder(batch)
+        return mu
     
-    def forward(self, batch, is_pretrain: bool=False):
-        seq, seq_len = batch.x, batch.seq_len
-        hidden = self.encoder(seq, seq_len)
-        mu, logvar = self.h2mu(hidden), self.h2logvar(hidden)
+    def forward(self, batch: SeqBatch, is_pretrain: bool=False) \
+                            -> Tuple[Tensor, Tensor, Tensor]:
+        r"""Forward pass of :class:`VaDE`. 
+        
+        Args:
+            batch (SeqBatch): Batch of data. The batch should contain :obj:`x` and :obj:`seq_len`.
+                The shape of :obj:`x` is :math:`[batch\_size, seq\_len]`. The shape of :obj:`seq_len`
+                is :math:`[batch\_size]`.
+            is_pretrain (bool): Whether to use the pretrain mode. (default: :obj:`False`)
+        
+        Returns:
+            x_hat (Tensor): Reconstruction of the input. The shape is :math:`[batch\_size, seq\_len, vocab\_size]`.
+            mu (Tensor): Mean of the latent space. The shape is :math:`[batch\_size, latent\_dim]`.
+            logvar (Tensor): Log variance of the latent space. The shape is :math:`[batch\_size, latent\_dim]`.
+        """
+        mu, logvar = self.encoder(batch)
         if is_pretrain == False:
             z = self.reparameterize(mu, logvar)
         else:
             z = mu
-        x_hat = self.decoder(z, seq, seq_len)
+        x_hat = self.decoder(z, batch)
         return x_hat, mu, logvar
-    
-    def ELBO_Loss(self, batch, L=1):
-        det = 1e-10
-        L_rec = 0
         
-        # Get latent representation
-        seq, seq_len = batch.x, batch.seq_len
-        latent_output = self.encoder(seq, seq_len)
-        z_mu, z_sigma2_log = self.h2mu(latent_output), self.h2logvar(latent_output)
+    def gaussian_pdfs_log(self, x: Tensor, mus: Tensor, log_sigma2s: Tensor) -> Tensor:
+        r"""Calculate the log probability density function of Gaussian distribution
+            for each cluster.
         
-        # Get reconstruction loss by Monte Carlo sampling
-        for l in range(L):
-            z = self.reparameterize(z_mu, z_sigma2_log)
-            x_hat = self.decoder(z, seq, seq_len)
-            recon_loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
-                                    seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
-                                    ignore_index=0)
-            L_rec += recon_loss
-        L_rec /= L
-        recon_loss = L_rec*batch.x.size(1)
+        Args:
+            x (Tensor): Input. The shape is :math:`[batch\_size, latent\_dim]`.
+            mus (Tensor): Mean of the clusters. The shape is :math:`[n\_clusters, latent\_dim]`.
+            log_sigma2s (Tensor): Log variance of the clusters. The shape is :math:`[n\_clusters, latent\_dim]`.
         
-        # Auxiliary variables
-        Loss = L_rec*batch.x.size(1)
-        pi =self.pi_
-        log_sigma2_c=self.logvar_c
-        mu_c=self.mu_c
-
-        # Compute the posterior probability of z given c
-        z = torch.randn_like(z_mu) * torch.exp(z_sigma2_log / 2) + z_mu
-        yita_c=torch.exp(torch.log(pi.unsqueeze(0))+self.gaussian_pdfs_log(z,mu_c,log_sigma2_c))+det
-        yita_c=yita_c/(yita_c.sum(1).view(-1,1))
-        self.yita_c=yita_c
-
-        # Add KL divergence loss
-        Loss+=0.5*torch.mean(torch.sum(yita_c*torch.sum(log_sigma2_c.unsqueeze(0)+
-                                                torch.exp(z_sigma2_log.unsqueeze(1)-log_sigma2_c.unsqueeze(0))+
-                                                (z_mu.unsqueeze(1)-mu_c.unsqueeze(0)).pow(2)/torch.exp(log_sigma2_c.unsqueeze(0)),2),1))
-
-        Loss-=torch.mean(torch.sum(yita_c*torch.log(pi.unsqueeze(0)/(yita_c)),1))+0.5*torch.mean(torch.sum(1+z_sigma2_log,1))
-
-        return x_hat, recon_loss, Loss - recon_loss
-    
-    def gaussian_pdfs_log(self, x, mus, log_sigma2s):
+        Returns:
+            G (Tensor): The log probability density function of Gaussian distribution
+                for each cluster. The shape is :math:`[batch\_size, n\_clusters]`.
+        """
         G=[]
         for c in range(self.n_clusters):
-            G.append(self.gaussian_pdf_log(x, 
-                                           mus[c:c+1,:], 
-                                           log_sigma2s[c:c+1,:]).view(-1, 1))
+            G.append(self.gaussian_pdf_log(x, mus[c:c+1,:], log_sigma2s[c:c+1,:]).view(-1, 1))
         return torch.cat(G, dim=1)
 
     @staticmethod
-    def gaussian_pdf_log(x,mu,log_sigma2):
-        return -0.5*(torch.sum(np.log(np.pi*2)+log_sigma2+(x-mu).pow(2)/torch.exp(log_sigma2),1))
-
-def weight_init(m):
-    if isinstance(m, nn.Linear):
-        nn.init.xavier_normal_(m.weight)
-        nn.init.constant_(m.bias, 0)
-    elif isinstance(m, nn.GRU):
+    def gaussian_pdf_log(x: Tensor, mu: Tensor, log_sigma2: Tensor) -> Tensor:
+        r"""Calculate the log probability density function of Gaussian distribution.
+            $$\log p(x)=\log \mathcal{N}(x|\mu, \sigma^2)=\log \frac{1}{\sqrt{2\pi\sigma^2}}\exp(-\frac{(x-\mu)^2}{2\sigma^2})$$
         
-        nn.init.orthogonal_(m.all_weights[0][0])
-        nn.init.orthogonal_(m.all_weights[0][1])
-        nn.init.zeros_(m.all_weights[0][2])
-        nn.init.zeros_(m.all_weights[0][3])
-        
-    elif isinstance(m, nn.Embedding):
-        nn.init.constant_(m.weight, 1)
-        
-
-if __name__ == '__main__':
-    model = VaDE()
-    seq = torch.randint(0, 35, (10, 100))
-    seq_len = torch.randint(10, 100, (10,))
-    out, mu, logvar, qc = model(seq, seq_len)
-    print(out.shape)
-    print(mu.shape)
-    print(qc.shape)
-    print(model.gmm_kl_div(mu, logvar))
-    print(model.mus_mutual_distance())
+        Returns:
+            density (Tensor): The log probability density function of Gaussian distribution.
+                The shape is :math:`[batch\_size]`.
+        """
+        density = -0.5*(torch.sum(np.log(np.pi*2)+log_sigma2+(x-mu).pow(2)/torch.exp(log_sigma2),1))
+        return density

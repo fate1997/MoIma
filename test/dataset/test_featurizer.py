@@ -44,8 +44,8 @@ def test_vocab_io():
     assert featurizer.vocab == random_vocab
 
 
-def test_reload_vocab(zinc1k):
-    df = pd.read_csv(zinc1k)
+def test_reload_vocab(zinc100):
+    df = pd.read_csv(zinc100)
     featurizer = SeqFeaturizer(vocab=['a'], seq_len=120)
     featurizer.reload_vocab(df.smiles)
     vocab = featurizer.vocab
