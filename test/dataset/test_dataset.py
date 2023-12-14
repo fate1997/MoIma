@@ -1,11 +1,12 @@
 import os
 
+import pytest
+from conftest import PipeStorage
+
+from moima.dataset import DatasetFactory
 from moima.dataset.descriptor_vec.dataset import DescDataset, VecBatch, VecData
 from moima.dataset.smiles_seq.data import SeqBatch, SeqData
 from moima.dataset.smiles_seq.dataset import SeqDataset
-
-from conftest import PipeStorage
-import pytest
 
 
 @pytest.mark.order(1)
@@ -107,3 +108,23 @@ def test_desc_dataset(zinc100):
     assert vec_batch.smiles == [dataset[0].smiles, dataset[1].smiles]
     
     PipeStorage.dataset['desc'] = dataset
+
+
+def test_dataset_factory(zinc100):
+    assert DatasetFactory.avail == ['smiles_seq', 'desc_vec']
+    seq_dataset = DatasetFactory.create(name='smiles_seq',
+                                        raw_path=zinc100,
+                                    featurizer_kwargs={'seq_len': 120})
+    assert isinstance(seq_dataset, SeqDataset)
+    assert len(seq_dataset) == 100
+    
+    desc_dataset = DatasetFactory.create(name='desc_vec',
+                                         raw_path=zinc100,
+                                         label_col='logP',
+                                        featurizer_kwargs={'mol_desc': 'ecfp',
+                                                        'ecfp_radius': 4,
+                                                        'ecfp_n_bits': 2048})
+    assert isinstance(desc_dataset, DescDataset)
+    assert len(desc_dataset) == 100
+    assert desc_dataset[0].y.shape == (1, )
+    assert desc_dataset[0].x.shape == (2048, )

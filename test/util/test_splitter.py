@@ -1,6 +1,7 @@
 import pytest
 from moima.utils.splitter.random_splitter import RandomSplitter
 from conftest import PipeStorage
+from moima.utils.splitter import SplitterFactory
 
 
 @pytest.mark.order(2)
@@ -23,3 +24,10 @@ def test_random_splitter():
         assert test is None
         assert len(train.dataset) == 80
         assert len(val.dataset) == 10
+
+
+@pytest.mark.order(2)
+def test_splitter_factory():
+    assert SplitterFactory.avail == ['random']
+    splitter = SplitterFactory.create(name='random', frac_train=0.8, frac_val=0.1)
+    assert isinstance(splitter, RandomSplitter)

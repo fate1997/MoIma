@@ -10,6 +10,7 @@ SPLITTER_REGISTRY = {
 
 class SplitterFactory:
     """Factory class for splitter."""
+    avail = list(SPLITTER_REGISTRY.keys())
         
     @staticmethod
     def create(**kwargs) -> SplitterABC:
@@ -26,8 +27,3 @@ class SplitterFactory:
         if name not in SPLITTER_REGISTRY:
             raise ValueError(f"Dataset {name} is not available.")
         return SPLITTER_REGISTRY[name](**kwargs)
-    
-    @property
-    def avail(self) -> List[str]:
-        """List of available splitters."""
-        return list(SPLITTER_REGISTRY.keys())
