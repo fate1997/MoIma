@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Tuple
-from moima.dataset._abc import DatasetABC
+
 from torch.utils.data import DataLoader
 from torch_geometric.loader import DataLoader as GeometricDataLoader
+
+from moima.dataset._abc import DatasetABC
 
 
 class SplitterABC(ABC):

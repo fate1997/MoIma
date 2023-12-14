@@ -38,6 +38,7 @@ class RandomSplitter(SplitterABC):
         self.batch_size = batch_size
         
     def _float2int(self, dataset_len: int):
+        r"""Convert the float ratios to integers."""
         number_list = self.train_val
         if isinstance(number_list[0], float):
             number_list[0] = int(number_list[0] * dataset_len)
@@ -46,6 +47,14 @@ class RandomSplitter(SplitterABC):
         self.train_val = number_list
         
     def __call__(self, dataset: DatasetABC) -> Tuple[DataLoader, DataLoader, DataLoader]:
+        r"""Split the dataset into train, val and test data loaders.
+        
+        Args:
+            dataset (DatasetABC): The dataset to be split.
+        
+        Returns:
+            A tuple of train, val and test data loaders.
+        """
         dataset.random_shuffle(self.seed)
         self._float2int(len(dataset))
         

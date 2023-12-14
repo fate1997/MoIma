@@ -2,34 +2,45 @@ import json
 import os
 from typing import List, Literal, Optional
 
-import numpy as np
 import torch
 from rdkit import Chem, RDLogger
 from tqdm import tqdm
 
 from moima.pipeline.pipe import PipeABC
+from moima.typing import MolRepr
 
 RDLogger.DisableLog('rdApp.*')
 
 
 class GenerationMetrics:
+    r"""Metrics for evaluating the generation performance of a model.
+    
+    Args:
+    """
     AVAIL_METRICS = ['valid', 'unique', 'novel', 'recon_accuracy']
-    def __init__(self, 
-                 pipe: PipeABC, 
-                 device: torch.device = torch.device('cuda'),
-                 num_samples: int = 10000,
-                 split: Literal['train', 'val', 'test'] = 'test'):
-        self.pipe = pipe
-        self.pipe.device = device
-        self.pipe.model.eval()
-        self.device = device
-        self.num_samples = num_samples
-        if split == 'train':
-            self.loader = self.pipe.train_loader
-        elif split == 'val':
-            self.loader = self.pipe.val_loader
-        elif split == 'test':
-            self.loader = self.pipe.test_loader
+    def __init__(self, sampled_mols: MolRepr, train_mols: MolRepr):
+        self.sampled_smiles = list(map(self.mol2smiles, sampled_mols))
+        self.sampled_rdmols = list(map(self.smiles2mol, sampled_mols))
+        self.train_smiles = list(map(self.mol2smiles, train_mols))
+        self.train_rdmols = list(map(self.smiles2mol, train_mols))
+    
+    @staticmethod
+    def mol2smiles(mol: MolRepr) -> str:
+        if isinstance(mol, str):
+            return mol
+        elif isinstance(mol, Chem.Mol):
+            return Chem.MolToSmiles(mol)
+        else:
+            raise TypeError(f'Unsupported type {type(mol)}')
+    
+    @staticmethod
+    def smiles2mol(mol: MolRepr) -> Optional[Chem.Mol]:
+        if isinstance(mol, str):
+            return Chem.MolFromSmiles(mol)
+        elif isinstance(mol, Chem.Mol):
+            return mol
+        else:
+            raise TypeError(f'Unsupported type {type(mol)}')
     
     def get_metrics(self, metric_names: List[str] = None, save_path: str = None):
         if metric_names is None:
