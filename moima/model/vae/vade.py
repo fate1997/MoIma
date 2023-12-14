@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Dict
 
 import numpy as np
 import torch
@@ -118,6 +118,8 @@ class VaDE(nn.Module):
             x_hat (Tensor): Reconstruction of the input. The shape is :math:`[batch\_size, seq\_len, vocab\_size]`.
             mu (Tensor): Mean of the latent space. The shape is :math:`[batch\_size, latent\_dim]`.
             logvar (Tensor): Log variance of the latent space. The shape is :math:`[batch\_size, latent\_dim]`.
+            eta_c (Tensor): The probability of each cluster given z. The shape is :math:`[batch\_size, n\_clusters]`.
+                $$\eta_c=\frac{\pi_c\mathcal{N}(z|\mu_c, \sigma_c)}{\sum_{c=1}^C\pi_c\mathcal{N}(z|\mu_c, \sigma_c)}$$
         """
         mu, logvar = self.encoder(batch)
         if is_pretrain == False:
@@ -125,7 +127,14 @@ class VaDE(nn.Module):
         else:
             z = mu
         x_hat = self.decoder(z, batch)
-        return x_hat, mu, logvar
+        
+        # Calculate the probability of each cluster given z
+        det = 1e-10
+        pi = self.pi_
+        log_sigma2_c = self.logvar_c
+        mu_c = self.mu_c
+        eta_c = torch.exp(torch.log(pi.unsqueeze(0))+self.gaussian_pdfs_log(z,mu_c,log_sigma2_c))+det
+        return x_hat, mu, logvar, eta_c
         
     def gaussian_pdfs_log(self, x: Tensor, mus: Tensor, log_sigma2s: Tensor) -> Tensor:
         r"""Calculate the log probability density function of Gaussian distribution
@@ -156,3 +165,55 @@ class VaDE(nn.Module):
         """
         density = -0.5*(torch.sum(np.log(np.pi*2)+log_sigma2+(x-mu).pow(2)/torch.exp(log_sigma2),1))
         return density
+    
+    def ELBO_Loss(self, batch: SeqBatch) -> Dict[str, Tensor]:
+        r"""Calculate the ELBO loss of :class:`VaDE`.
+        
+        Args:
+            batch (SeqBatch): Batch of data. The batch should contain :obj:`x` and :obj:`seq_len`.
+                The shape of :obj:`x` is :math:`[batch\_size, seq\_len]`. The shape of :obj:`seq_len`
+                is :math:`[batch\_size]`.
+            num_mc_rounds (int): Number of Monte Carlo sampling when calculating the reconstruction loss.
+                (default: :obj:`1`)
+
+        Returns:
+            x_hat (Tensor): Reconstruction of the input. The shape is :math:`[batch\_size, seq\_len, vocab\_size]`.
+            recon_loss (Tensor): Reconstruction loss. Calculated by:
+                $$\mathcal{L}_{rec}=-\sum_{t=1}^{T}\log p(x_t|z)$$
+            kl_loss (Tensor): KL divergence loss. Calculated by:
+                $$\mathcal{L}_{KL}=\sum_{c=1}^{C}\sum_{i=1}^{N}q(c_i|x_i)\log \frac{q(c_i|x_i)}{p(c_i)}-\sum_{c=1}^{C}q(c|x_i)\log q(c|x_i)$$
+        """
+        det = 1e-10
+        L_rec = 0
+        
+        # Get latent representation
+        mu, logvar = self.encoder(batch)
+        
+        # Get reconstruction loss by Monte Carlo sampling
+        z = self.reparameterize(mu, logvar)
+        seq, seq_len = batch.x, batch.seq_len
+        x_hat = self.decoder(z, batch)
+        L_rec = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
+                                seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
+                                ignore_index=0)
+        recon_loss = L_rec * batch.x.size(1)
+        
+        # Auxiliary variables
+        Loss = L_rec*batch.x.size(1)
+        pi = self.pi_
+        log_sigma2_c = self.logvar_c
+        mu_c = self.mu_c
+
+        # Compute the posterior probability of z given c
+        z = self.reparameterize(mu, logvar)
+        yita_c = torch.exp(torch.log(pi.unsqueeze(0))+self.gaussian_pdfs_log(z,mu_c,log_sigma2_c))+det
+        yita_c = yita_c/(yita_c.sum(1).view(-1,1))
+
+        # Add KL divergence loss
+        Loss += 0.5*torch.mean(torch.sum(yita_c*torch.sum(log_sigma2_c.unsqueeze(0)+
+                                                torch.exp(logvar.unsqueeze(1)-log_sigma2_c.unsqueeze(0))+
+                                                (mu.unsqueeze(1)-mu_c.unsqueeze(0)).pow(2)/torch.exp(log_sigma2_c.unsqueeze(0)),2),1))
+
+        Loss -= torch.mean(torch.sum(yita_c*torch.log(pi.unsqueeze(0)/(yita_c)),1))+0.5*torch.mean(torch.sum(1+logvar,1))
+
+        return x_hat, recon_loss, Loss - recon_loss

@@ -54,12 +54,15 @@ def test_vade():
     assert isinstance(output[0], torch.Tensor)
     assert isinstance(output[1], torch.Tensor)
     assert isinstance(output[2], torch.Tensor)
+    assert isinstance(output[3], torch.Tensor)
     assert torch.isnan(output[0]).sum() == 0
     assert torch.isnan(output[1]).sum() == 0
     assert torch.isnan(output[2]).sum() == 0
+    assert torch.isnan(output[3]).sum() == 0
     assert output[0].size() == (2, 120, vocab_size)
     assert output[1].size() == (2, 64)
     assert output[2].size() == (2, 64)
+    assert output[3].size() == (2, 10)
     
     latent_repr = model.get_repr(batch)
     assert isinstance(latent_repr, torch.Tensor)

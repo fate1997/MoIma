@@ -24,6 +24,9 @@ def test_random_splitter():
         assert test is None
         assert len(train.dataset) == 80
         assert len(val.dataset) == 10
+    
+    splitter = RandomSplitter(0.8, 0.1, True, 64, 42)
+    PipeStorage.splitter['random'] = splitter
 
 
 @pytest.mark.order(2)

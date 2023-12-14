@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
-import torch
-from typing import Any
+from typing import Any, Union
+
+from torch import Tensor
 
 
 class LossCalcABC(ABC):
     
     @abstractmethod
-    def __call__(self, *args: Any, **kwargs: Any) -> torch.Tensor:
+    def __call__(self, *args: Any, **kwargs: Any) -> Union[Tensor, dict]:
         """Calculate the loss."""
