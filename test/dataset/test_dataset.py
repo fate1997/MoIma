@@ -3,17 +3,29 @@ import os
 import pytest
 from conftest import PipeStorage
 
-from moima.dataset import DatasetFactory
-from moima.dataset.descriptor_vec.dataset import DescDataset, VecBatch, VecData
+from moima.dataset import build_dataset
+from moima.dataset.descriptor_vec.dataset import DescDataset, VecBatch, VecData, DescFeaturizer
 from moima.dataset.smiles_seq.data import SeqBatch, SeqData
-from moima.dataset.smiles_seq.dataset import SeqDataset
+from moima.dataset.smiles_seq.dataset import SeqDataset, SeqFeaturizer
+
+
+@pytest.fixture(scope='session')
+def seq_featurizer():
+    return SeqFeaturizer(seq_len=120)
+
+
+@pytest.fixture(scope='session')
+def desc_featurizer():
+    return DescFeaturizer(mol_desc='ecfp,rdkit',
+                          ecfp_radius=4,
+                          ecfp_n_bits=2048)
 
 
 @pytest.mark.order(1)
-def test_abc_and_seq_dataset(zinc100, helpers):
-    
+def test_abc_and_seq_dataset(zinc100, helpers, seq_featurizer):
+    featurizer = SeqFeaturizer(seq_len=120)
     dataset = SeqDataset(zinc100, 
-                        featurizer_kwargs={'seq_len': 120},
+                        featurizer=seq_featurizer,
                         vocab_path=None,
                         processed_path=None,
                         force_reload=False,
@@ -25,7 +37,7 @@ def test_abc_and_seq_dataset(zinc100, helpers):
     zinc100_vocab = os.path.splitext(zinc100)[0] + '_vocab.pkl'
     helpers.remove_files(zinc100_processed, zinc100_vocab)
     dataset = SeqDataset(zinc100,
-                        featurizer_kwargs={'seq_len': 120},
+                        featurizer=seq_featurizer,
                         vocab_path=None,
                         processed_path=None,
                         force_reload=False,
@@ -34,7 +46,7 @@ def test_abc_and_seq_dataset(zinc100, helpers):
     assert os.path.exists(zinc100_vocab)
     
     dataset = SeqDataset(zinc100,
-                        featurizer_kwargs={'seq_len': 120},
+                        featurizer=seq_featurizer,
                         vocab_path=None,
                         processed_path=None,
                         force_reload=False,
@@ -43,7 +55,7 @@ def test_abc_and_seq_dataset(zinc100, helpers):
     assert os.path.exists(zinc100_processed)
     
     dataset = SeqDataset(zinc100,
-                        featurizer_kwargs={'seq_len': 120},
+                        featurizer=seq_featurizer,
                         vocab_path=None,
                         processed_path=zinc100_processed,
                         force_reload=False,
@@ -56,7 +68,7 @@ def test_abc_and_seq_dataset(zinc100, helpers):
     assert batch.smiles == [dataset[0].smiles, dataset[1].smiles]
     
     dataset = SeqDataset(zinc100,
-                        featurizer_kwargs={'seq_len': 120},
+                        featurizer=seq_featurizer,
                         additional_cols=['logP', 'qed'],
                         vocab_path=None,
                         processed_path=None,
@@ -82,13 +94,14 @@ def test_abc_and_seq_dataset(zinc100, helpers):
 
 
 @pytest.mark.order(1)
-def test_desc_dataset(zinc100):
+def test_desc_dataset(zinc100, desc_featurizer):
+    featurizer = DescFeaturizer(mol_desc='ecfp,rdkit',
+                                ecfp_radius=4,
+                                ecfp_n_bits=2048)
     dataset = DescDataset(zinc100,
                           label_col='logP',
                           additional_cols=['qed', 'SAS'],
-                          featurizer_kwargs={'mol_desc': 'ecfp,rdkit',
-                                             'ecfp_radius': 4,
-                                             'ecfp_n_bits': 2048},
+                          featurizer=desc_featurizer,
                           force_reload=False,
                           save_processed=False)
     assert len(dataset) == 100
@@ -110,21 +123,25 @@ def test_desc_dataset(zinc100):
     PipeStorage.dataset['desc'] = dataset
 
 
-def test_dataset_factory(zinc100):
-    assert DatasetFactory.avail == ['smiles_seq', 'desc_vec']
-    seq_dataset = DatasetFactory.create(name='smiles_seq',
-                                        raw_path=zinc100,
-                                    featurizer_kwargs={'seq_len': 120})
+def test_dataset_factory(zinc100, desc_featurizer, seq_featurizer):
+    seq_dataset = build_dataset(name='smiles_seq',
+                                raw_path=zinc100,
+                                featurizer=seq_featurizer)
     assert isinstance(seq_dataset, SeqDataset)
     assert len(seq_dataset) == 100
     
-    desc_dataset = DatasetFactory.create(name='desc_vec',
-                                         raw_path=zinc100,
-                                         label_col='logP',
-                                        featurizer_kwargs={'mol_desc': 'ecfp',
-                                                        'ecfp_radius': 4,
-                                                        'ecfp_n_bits': 2048})
+    kwargs = {'name': 'smiles_seq',
+              'raw_path': zinc100,
+              'featurizer': seq_featurizer}
+    seq_dataset = build_dataset(**kwargs)
+    assert isinstance(seq_dataset, SeqDataset)
+    assert len(seq_dataset) == 100
+    
+    kwargs = {'raw_path': zinc100,
+              'label_col': 'logP',
+              'featurizer': desc_featurizer}
+    desc_dataset = build_dataset(name='desc_vec', **kwargs)
     assert isinstance(desc_dataset, DescDataset)
     assert len(desc_dataset) == 100
     assert desc_dataset[0].y.shape == (1, )
-    assert desc_dataset[0].x.shape == (2048, )
+    assert desc_dataset[0].x.shape == (2259, )

@@ -71,4 +71,5 @@ class VAELossCalc(LossCalcABC):
                                      ignore_index=0)
         loss_dict['recon_loss'] = recon_loss
         loss_dict['kl_loss'] = kl_loss
+        loss_dict['loss'] = recon_loss + kl_loss
         return loss_dict

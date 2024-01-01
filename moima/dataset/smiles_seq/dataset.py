@@ -26,16 +26,16 @@ class SeqDataset(DatasetABC):
     """
     def __init__(self, 
                  raw_path: str,
-                 featurizer_kwargs: dict,
                  additional_cols: List[str] = [],
+                 featurizer: SeqFeaturizer = None,
                  vocab_path: str = None,
                  processed_path: str = None,
                  force_reload: bool = False,
                  save_processed: bool = False):
         self.vocab_path = vocab_path
         self.additional_cols = additional_cols
-        super().__init__(raw_path, SeqFeaturizer, featurizer_kwargs,
-                         processed_path, force_reload, save_processed)
+        super().__init__(raw_path, featurizer, processed_path, 
+                         force_reload, save_processed)
     
     @staticmethod
     def collate_fn(batch: List[SeqData]) -> SeqBatch:
@@ -61,13 +61,15 @@ class SeqDataset(DatasetABC):
         smiles_col = self._get_smiles_column(df)
         
         # Load vocabulary
+        if self.vocab_path is None:
+            self.vocab_path = os.path.splitext(self.raw_path)[0] + '_vocab.pkl'
         smiles_list = df[smiles_col].tolist()
-        if self.vocab_path is not None:
+        if os.path.exists(self.vocab_path):
+            print('Load vocabulary from', self.vocab_path)
             self.featurizer.load_vocab(self.vocab_path)
         else:
             self.featurizer.reload_vocab(smiles_list)
-            vocab_path = os.path.splitext(self.raw_path)[0] + '_vocab.pkl'
-            self.featurizer.save_vocab(vocab_path)
+            self.featurizer.save_vocab(self.vocab_path)
         
         # Extract additional columns
         additional_kwargs = dict(zip(self.additional_cols,

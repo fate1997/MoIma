@@ -11,19 +11,15 @@ from moima.dataset.descriptor_vec.featurizer import DescFeaturizer
 class DescDataset(DatasetABC):
     def __init__(self, 
                  raw_path: str, 
+                 featurizer: DescFeaturizer,
                  label_col: Union[str, List[str]],
                  additional_cols: List[str] = [],
-                 featurizer_kwargs: dict=None, 
                  processed_path: str = None, 
                  force_reload: bool = False, 
                  save_processed: bool = False):
         self.label_col = [label_col] if isinstance(label_col, str) else label_col
         self.additional_cols = additional_cols
-        super().__init__(raw_path, 
-                         DescFeaturizer,
-                         featurizer_kwargs,
-                         processed_path, 
-                         force_reload, 
+        super().__init__(raw_path, featurizer, processed_path, force_reload, 
                          save_processed)
         
     @staticmethod
@@ -60,7 +56,7 @@ class DescDataset(DatasetABC):
             labels = labels.reshape(-1, 1)
         additional_kwargs = dict(zip(self.additional_cols,
                                      df[self.additional_cols].values.T))
-        additional_kwargs.update({'y': labels})
+        additional_kwargs.update({'y': torch.FloatTensor(labels)})
         
         data_list = self.featurizer(smiles_list, **additional_kwargs)
 

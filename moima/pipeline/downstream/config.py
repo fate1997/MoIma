@@ -35,9 +35,6 @@ class DownstreamPipeConfig(DefaultConfig):
     label_col: str = field(default='label',
                             metadata={'help': 'The label column name.',
                                       'type': ArgType.DATASET})
-    vocab_path: str = field(default=None,
-                            metadata={'help': 'The path to the vocabulary.',
-                                      'type': ArgType.DATASET})
     
     # Featurizer
     mol_desc: str = field(default='ecfp',

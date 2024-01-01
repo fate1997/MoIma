@@ -133,3 +133,7 @@ class DescFeaturizer(FeaturizerABC):
         desc = torch.from_numpy(desc).float()
         
         return VecData(desc, None, mol)
+    
+    @property
+    def arg4model(self) -> dict:
+        return {'input_dim': len(self.columns)}

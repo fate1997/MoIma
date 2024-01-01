@@ -3,6 +3,8 @@ import os
 from typing import List, Literal, Optional
 
 import torch
+from torch import Tensor
+from torch.utils.data import DataLoader
 from rdkit import Chem, RDLogger
 from tqdm import tqdm
 
@@ -18,11 +20,23 @@ class GenerationMetrics:
     Args:
     """
     AVAIL_METRICS = ['valid', 'unique', 'novel', 'recon_accuracy']
-    def __init__(self, sampled_mols: MolRepr, train_mols: MolRepr):
+    def __init__(self, 
+                 sampled_mols: List[MolRepr], 
+                 train_mols: List[MolRepr],
+                 input_mols: List[MolRepr]=None,
+                 recon_mols: List[MolRepr]=None):
         self.sampled_smiles = list(map(self.mol2smiles, sampled_mols))
         self.sampled_rdmols = list(map(self.smiles2mol, sampled_mols))
+        self.num_samples = len(self.sampled_smiles)
         self.train_smiles = list(map(self.mol2smiles, train_mols))
         self.train_rdmols = list(map(self.smiles2mol, train_mols))
+       
+        if input_mols is not None:
+            self.input_smiles = list(map(self.mol2smiles, input_mols))
+        if recon_mols is not None:
+            self.recon_smiles = list(map(self.mol2smiles, recon_mols))
+        
+        self.valid_mols = [mol for mol in self.sampled_rdmols if mol is not None]
     
     @staticmethod
     def mol2smiles(mol: MolRepr) -> str:
@@ -30,6 +44,8 @@ class GenerationMetrics:
             return mol
         elif isinstance(mol, Chem.Mol):
             return Chem.MolToSmiles(mol)
+        elif mol is None:
+            return None
         else:
             raise TypeError(f'Unsupported type {type(mol)}')
     
@@ -39,6 +55,8 @@ class GenerationMetrics:
             return Chem.MolFromSmiles(mol)
         elif isinstance(mol, Chem.Mol):
             return mol
+        elif mol is None:
+            return None
         else:
             raise TypeError(f'Unsupported type {type(mol)}')
     
@@ -54,60 +72,26 @@ class GenerationMetrics:
             with open(save_path, 'w') as f:
                 json.dump(metrics, f)
         return metrics
-    
-    def to_json(self, metric_names: List[str] = None):
-        metrics = self.get_metrics(metric_names)
-        file_path = os.path.join(self.pipe.config.output_folder,
-                                 f'generation_metrics_{self.pipe.config.desc}.json')
-        with open(file_path, 'w') as f:
-            json.dump(metrics, f)
-    
-    def rand_sample(self, num_samples: int) -> List[Optional[Chem.Mol]]:
-        if getattr(self, 'valid_mols', None) is not None:
-            return self.valid_mols
-        sampled_smiles = self.pipe.sample(num_samples)
-        mols = []
-        for smiles in tqdm(sampled_smiles):
-            mol = Chem.MolFromSmiles(smiles)
-            mols.append(mol)
-        valid_mols = [mol is not None for mol in mols]
-        self.valid_mols = [mols[i] for i, valid in enumerate(valid_mols) if valid]
-        return self.valid_mols
-    
+            
     @property
     def valid(self):
-        valid_mols = self.rand_sample(self.num_samples)
-        return len(valid_mols) / self.num_samples
+        return len(self.valid_mols) / self.num_samples
     
     @property
     def unique(self):
-        valid_mols = self.rand_sample(self.num_samples)
-        unique_mols = set([Chem.MolToSmiles(mol) for mol in valid_mols])
-        return len(unique_mols) / len(valid_mols)
+        unique_mols = set([Chem.MolToSmiles(mol) for mol in self.valid_mols])
+        return len(unique_mols) / len(self.valid_mols)
     
     @property
     def novel(self):
-        valid_mols = self.rand_sample(self.num_samples)
-        valid_smiles = [Chem.MolToSmiles(mol) for mol in valid_mols]
-        train_smiles = []
-        for batch in self.pipe.train_loader:
-            for smiles in batch.smiles:
-                train_smiles.append(smiles)
+        valid_smiles = [Chem.MolToSmiles(mol) for mol in self.valid_mols]
+        train_smiles = self.train_smiles
         return len(set(valid_smiles) - set(train_smiles)) / len(valid_smiles)
     
     @property
     def recon_accuracy(self):
-        count = 0
         success = 0
-        for batch in tqdm(self.loader, desc='Model Running'):
-            self.pipe.model.to(self.device)
-            x_hat, _ = self.pipe._forward_batch(batch)
-            x_hat = x_hat.detach().cpu()
-            
-            for i, x in enumerate(x_hat):
-                recon_output = self.pipe.featurizer.decode(x, is_raw=False)
-                original = batch.smiles[i]
-                count += 1
-                if recon_output == original:
-                    success += 1
-        return success / count
+        for i in range(len(self.input_smiles)):
+            if self.input_smiles[i] == self.recon_smiles[i]:
+                success += 1
+        return success / len(self.input_smiles)

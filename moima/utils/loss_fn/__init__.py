@@ -15,22 +15,18 @@ LOSS_FN_REGISTRY = {
 }
 
 
-class LossCalcFactory:
-    """Factory class for loss calculator."""
-    avail = list(LOSS_FN_REGISTRY.keys())
-        
-    @staticmethod
-    def create(**kwargs) -> LossCalcABC:
-        """Create a loss calculator instance by name.
-        
-        Args:
-            name (str): Name of the loss calculator.
-            **kwargs: Arguments for the loss calculator.
-        
-        Returns:
-            A loss calculator instance.
-        """
+def build_loss_fn(name: str=None, **kwargs) -> LossCalcABC:
+    """Build a loss calculator instance by name.
+    
+    Args:
+        name (str): Name of the loss calculator. If None, the name will be read from kwargs.
+        **kwargs: Arguments for the loss calculator.
+    
+    Returns:
+        A loss calculator instance.
+    """
+    if name is None:
         name = kwargs.pop('name')
-        if name not in LOSS_FN_REGISTRY:
-            raise ValueError(f"Loss calcualtor {name} is not available.")
-        return LOSS_FN_REGISTRY[name](**kwargs)
+    if name not in LOSS_FN_REGISTRY:
+        raise ValueError(f"Loss calcualtor {name} is not available.")
+    return LOSS_FN_REGISTRY[name](**kwargs)

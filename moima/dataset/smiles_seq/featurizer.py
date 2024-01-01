@@ -44,8 +44,7 @@ class SeqFeaturizer(FeaturizerABC):
                  seq_len: int=120):
         assert len(set(vocab)) == len(vocab), "Vocabulary contains duplicate characters."
         self.seq_len = seq_len
-        self.vocab = vocab
-        self._set_vocab_dict()
+        self._set_vocab(vocab)
     
     @property
     def vocab_size(self) -> int:
@@ -74,7 +73,7 @@ class SeqFeaturizer(FeaturizerABC):
         except KeyError:
             raise KeyError(f"SMILES string {smiles_copy} contains unknown characters.")
         seq = torch.tensor(seq, dtype=torch.long)
-        seq_len = torch.tensor(len(revised_smiles), dtype=torch.long)
+        seq_len = torch.tensor(len(smiles) + 2, dtype=torch.long)
         return SeqData(seq, seq_len, smiles_copy)
 
     def reload_vocab(self, smiles_list: List[str]):
@@ -94,13 +93,13 @@ class SeqFeaturizer(FeaturizerABC):
                 s.add(c)
         vocab = sorted(list(s))
         vocab = [self.PAD, self.SOS, self.EOS] + vocab
-        self.vocab = vocab
-        self._set_vocab_dict()
+        self._set_vocab(vocab)
     
     def load_vocab(self, file_path: str) -> List[str]:
         r"""Load the vocab from a pickle file."""
         with open(file_path, 'rb') as f:
             vocab = pickle.load(f)
+        self._set_vocab(vocab)
         return vocab
     
     def save_vocab(self, file_path: str) -> str:
@@ -131,8 +130,9 @@ class SeqFeaturizer(FeaturizerABC):
         smiles = self._single2double(smiles)
         return smiles  
     
-    def _set_vocab_dict(self):
+    def _set_vocab(self, vocab: List[str]):
         r"""Set the vocab dictionary."""
+        self.vocab = vocab
         self.vocab_dict =  {c: i for i, c in enumerate(self.vocab)}
     
     def _double2single(self, smiles: str) -> str:
@@ -146,3 +146,7 @@ class SeqFeaturizer(FeaturizerABC):
         for k, v in self.DOUBLE_TOKEN_DICT.items():
             smiles = smiles.replace(v, k)
         return smiles
+    
+    @property
+    def arg4model(self) -> dict:
+        return {'vocab_size': self.vocab_size}

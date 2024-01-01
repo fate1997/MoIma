@@ -9,7 +9,6 @@ from moima.model.vae.decoders import GRUDecoder
 def test_gru_encoder_decoder():
     seq_dataset = PipeStorage.dataset['seq']
     batch = seq_dataset.collate_fn([seq_dataset[0], seq_dataset[1]])
-    print(batch.x.shape, batch.seq_len.shape)
     vocab_dim = len(seq_dataset.featurizer.vocab)
     encoder = GRUEncoder(vocab_dim=vocab_dim,
                             emb_dim=128,
@@ -31,6 +30,8 @@ def test_gru_encoder_decoder():
                             vocab_dim=vocab_dim,
                             emb_dim=128)
     output = decoder(mu, batch)
-    assert output.shape == (2, 120, vocab_dim)
+    assert output.shape[0] == 2
+    assert output.shape[1] <= 120
+    assert output.shape[2] == vocab_dim
     assert isinstance(output, torch.Tensor)
     assert torch.isnan(output).sum() == 0

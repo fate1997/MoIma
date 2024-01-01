@@ -21,7 +21,7 @@ class VaDELossCalc:
                  mu: Tensor,
                  logvar: Tensor,
                  x_hat: Tensor,
-                 eta_c: Tensor,
+                 log_eta_c: Tensor,
                  pi: Tensor, 
                  mu_c: Tensor,
                  logvar_c: Tensor,) -> Dict[str, Tensor]:
@@ -32,18 +32,21 @@ class VaDELossCalc:
             mu (Tensor): The mean of the latent representation.
             logvar (Tensor): The log variance of the latent representation.
             x_hat (Tensor): Reconstruction of the input.
-            eta_c (Tensor): The probability of c given z.
+            log_eta_c (Tensor): The probability of c given z.
             pi (Tensor): The prior probability of c.
             mu_c (Tensor): The mean of the latent representation given c.
             logvar_c (Tensor): The log variance of the latent representation given c.
         
         Returns:
-            A dictionary of loss. The keys are :obj:`recon_loss` and :obj:`kl_loss`.
+            A dictionary of loss. The keys are :obj:`recon_loss`, :obj:`kl_loss`, 
+                and :obj:`loss`.
         """
         recon_loss = self.recon_loss(batch, x_hat)
-        kl_loss = self.kl_loss(mu, logvar, eta_c, pi, mu_c, logvar_c)
+        kl_loss = self.kl_loss(mu, logvar, log_eta_c, pi, mu_c, logvar_c)
         kl_loss = self.kl_weight * kl_loss
-        loss_dict = {'recon_loss': recon_loss, 'kl_loss': kl_loss}
+        loss_dict = {'recon_loss': recon_loss, 
+                     'kl_loss': kl_loss, 
+                     'loss': recon_loss+kl_loss}
         return loss_dict
     
     @staticmethod
@@ -62,12 +65,13 @@ class VaDELossCalc:
         loss = F.cross_entropy(x_hat[:, :-1].contiguous().view(-1, x_hat.size(-1)),
                         seq[:, 1:torch.max(seq_len).item()].contiguous().view(-1),
                         ignore_index=0)
+        loss = loss * seq.size(1)
         return loss
     
     @staticmethod
     def kl_loss(mu: Tensor, 
                 logvar: Tensor, 
-                eta_c: Tensor,
+                log_eta_c: Tensor,
                 pi: Tensor, 
                 mu_c: Tensor,
                 logvar_c: Tensor) -> Tensor:
@@ -77,7 +81,7 @@ class VaDELossCalc:
         Args:
             mu (Tensor): The mean of the latent representation.
             logvar (Tensor): The log variance of the latent representation.
-            eta_c (Tensor): The probability of c given z.
+            log_eta_c (Tensor): The probability of c given z.
             pi (Tensor): The prior probability of c.
             mu_c (Tensor): The mean of the latent representation given c.
             logvar_c (Tensor): The log variance of the latent representation given c.
@@ -86,9 +90,17 @@ class VaDELossCalc:
             The KL divergence loss.
         """
         # Add KL divergence loss
+        eta_c = torch.exp(log_eta_c)
+        if torch.isnan(eta_c).any():
+            raise ValueError('eta_c contains NaN')
         loss = 0.5*torch.mean(torch.sum(eta_c*torch.sum(logvar_c.unsqueeze(0)+
                                         torch.exp(logvar.unsqueeze(1)-logvar_c.unsqueeze(0))+
                                         (mu.unsqueeze(1)-mu_c.unsqueeze(0)).pow(2)/torch.exp(logvar_c.unsqueeze(0)),2),1))
-
-        loss -= torch.mean(torch.sum(eta_c*torch.log(pi.unsqueeze(0)/(eta_c)),1))+0.5*torch.mean(torch.sum(1+logvar,1))
-        return loss       
+        if torch.isnan(loss).any():
+            raise ValueError('loss contains NaN')
+        # print(f'first term: {loss.item()}, second term: {(torch.mean(torch.sum(eta_c*torch.log(pi.unsqueeze(0)/(eta_c)),1))+0.5*torch.mean(torch.sum(1+logvar,1))).item()}')
+        loss -= torch.mean(torch.sum(eta_c*(torch.log(pi.unsqueeze(0))-log_eta_c),1))+0.5*torch.mean(torch.sum(1+logvar,1))
+        if torch.isnan(loss).any():
+            print(f'** eta_c: {eta_c}, pi: {pi}, pi/eta_c: {pi.unsqueeze(0)/(eta_c)}')
+            raise ValueError('loss (2nd) contains NaN')
+        return loss

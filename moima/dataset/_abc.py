@@ -1,14 +1,16 @@
 import os
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from typing import List
 
 import numpy as np
 import pandas as pd
 import torch
 from torch_geometric.data import Dataset
+from torch_geometric.loader import DataLoader as GeometricDataLoader
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from moima.typing import LabelType, MolRepr
+from moima.typing import IndexType, MolRepr
 
 
 class DataABC(ABC):
@@ -60,6 +62,10 @@ class FeaturizerABC(ABC):
     @abstractmethod
     def encode(self, mol: MolRepr) -> DataABC:
         """Featurize the input raw data to Data."""
+    
+    @abstractproperty
+    def arg4model(self) -> dict:
+        """Return the arguments for the model."""
 
 class DatasetABC(Dataset):
     r"""Dataset abstract base class.
@@ -80,14 +86,13 @@ class DatasetABC(Dataset):
     
     def __init__(self,
                  raw_path: str,
-                 featurizer_cls: FeaturizerABC,
-                 featurizer_kwargs: dict=None,
+                 featurizer: FeaturizerABC,
                  processed_path: str=None,
                  force_reload: bool=False,
                  save_processed: bool=False):
         super().__init__()
         self.raw_path = raw_path
-        self.featurizer = featurizer_cls(**featurizer_kwargs)
+        self.featurizer = featurizer
         self.force_reload = force_reload
         self.save_processed = save_processed
         
@@ -137,3 +142,15 @@ class DatasetABC(Dataset):
         r"""Randomly shuffle the dataset."""
         np.random.seed(seed)
         np.random.shuffle(self.data_list)
+    
+    def create_loader(self, batch_size: int, shuffle: bool=True) -> DataLoader:
+        r"""Create a data loader for the dataset."""
+        if getattr(self, 'collate_fn', None):
+            return DataLoader(self, 
+                              batch_size=batch_size, 
+                              shuffle=shuffle,
+                              collate_fn=self.collate_fn)
+        else:
+            return GeometricDataLoader(self, 
+                                       batch_size=batch_size, 
+                                       shuffle=shuffle)

@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
 from torch import Tensor, nn
+from torch.distributions.multivariate_normal import MultivariateNormal
 
 from moima.dataset.smiles_seq.data import SeqBatch
 from moima.model._util import init_weight
@@ -60,10 +61,12 @@ class VaDE(nn.Module):
                                emb_dim)
         
         # Additional parameters to define the Gaussian mixture model
-        self.pi_=nn.Parameter(torch.FloatTensor(n_clusters, ).fill_(1)/n_clusters, requires_grad=True)
-        self.mu_c=nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
-        self.logvar_c=nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
-        self.gmm = GaussianMixture(n_components=n_clusters,  covariance_type='diag')
+        self.pi_ = nn.Parameter(torch.FloatTensor(n_clusters, ).fill_(1)/n_clusters, requires_grad=True)
+        self.mu_c = nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
+        self.logvar_c = nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
+        self.gmm = GaussianMixture(n_components=n_clusters,
+                                   covariance_type='diag', 
+                                   random_state=3)
         self.n_clusters = n_clusters
         self.latent_dim = latent_dim
         
@@ -127,44 +130,24 @@ class VaDE(nn.Module):
         else:
             z = mu
         x_hat = self.decoder(z, batch)
-        
         # Calculate the probability of each cluster given z
         det = 1e-10
         pi = self.pi_
         log_sigma2_c = self.logvar_c
         mu_c = self.mu_c
-        eta_c = torch.exp(torch.log(pi.unsqueeze(0))+self.gaussian_pdfs_log(z,mu_c,log_sigma2_c))+det
-        return x_hat, mu, logvar, eta_c
-        
-    def gaussian_pdfs_log(self, x: Tensor, mus: Tensor, log_sigma2s: Tensor) -> Tensor:
-        r"""Calculate the log probability density function of Gaussian distribution
-            for each cluster.
-        
-        Args:
-            x (Tensor): Input. The shape is :math:`[batch\_size, latent\_dim]`.
-            mus (Tensor): Mean of the clusters. The shape is :math:`[n\_clusters, latent\_dim]`.
-            log_sigma2s (Tensor): Log variance of the clusters. The shape is :math:`[n\_clusters, latent\_dim]`.
-        
-        Returns:
-            G (Tensor): The log probability density function of Gaussian distribution
-                for each cluster. The shape is :math:`[batch\_size, n\_clusters]`.
-        """
-        G=[]
-        for c in range(self.n_clusters):
-            G.append(self.gaussian_pdf_log(x, mus[c:c+1,:], log_sigma2s[c:c+1,:]).view(-1, 1))
-        return torch.cat(G, dim=1)
-
-    @staticmethod
-    def gaussian_pdf_log(x: Tensor, mu: Tensor, log_sigma2: Tensor) -> Tensor:
-        r"""Calculate the log probability density function of Gaussian distribution.
-            $$\log p(x)=\log \mathcal{N}(x|\mu, \sigma^2)=\log \frac{1}{\sqrt{2\pi\sigma^2}}\exp(-\frac{(x-\mu)^2}{2\sigma^2})$$
-        
-        Returns:
-            density (Tensor): The log probability density function of Gaussian distribution.
-                The shape is :math:`[batch\_size]`.
-        """
-        density = -0.5*(torch.sum(np.log(np.pi*2)+log_sigma2+(x-mu).pow(2)/torch.exp(log_sigma2),1))
-        return density
+        z = self.reparameterize(mu, logvar)
+        scale = torch.diag_embed(torch.exp(log_sigma2_c))
+        normal_pdf = MultivariateNormal(mu_c, scale).log_prob(z.unsqueeze(1))
+        eta_c = torch.log(pi.unsqueeze(0)) + normal_pdf
+        log_eta_c = eta_c - torch.logsumexp(eta_c, dim=1, keepdim=True)
+        """ 
+        if torch.isnan(normalized_eta_c).any():
+            print(f'eta_c: {eta_c}')
+            print(f'log_eta_c: {eta_c - torch.logsumexp(eta_c, dim=1, keepdim=True)}')
+            torch.save({'z': z, 'pi': pi, 'mu_c': mu_c, 'log_sigma2_c': log_sigma2_c}, 'vade_params.pt')
+            raise ValueError('eta_c contains NaN')
+         """
+        return x_hat, mu, logvar, log_eta_c
     
     def ELBO_Loss(self, batch: SeqBatch) -> Dict[str, Tensor]:
         r"""Calculate the ELBO loss of :class:`VaDE`.
@@ -213,7 +196,7 @@ class VaDE(nn.Module):
         Loss += 0.5*torch.mean(torch.sum(yita_c*torch.sum(log_sigma2_c.unsqueeze(0)+
                                                 torch.exp(logvar.unsqueeze(1)-log_sigma2_c.unsqueeze(0))+
                                                 (mu.unsqueeze(1)-mu_c.unsqueeze(0)).pow(2)/torch.exp(log_sigma2_c.unsqueeze(0)),2),1))
-
+        # print(f'first term: {0.5*torch.mean(torch.sum(yita_c*torch.sum(log_sigma2_c.unsqueeze(0)+torch.exp(logvar.unsqueeze(1)-log_sigma2_c.unsqueeze(0))+(mu.unsqueeze(1)-mu_c.unsqueeze(0)).pow(2)/torch.exp(log_sigma2_c.unsqueeze(0)),2),1)).item()}, second term: {(torch.mean(torch.sum(yita_c*torch.log(pi.unsqueeze(0)/(yita_c)),1))+0.5*torch.mean(torch.sum(1+logvar,1))).item()}')
         Loss -= torch.mean(torch.sum(yita_c*torch.log(pi.unsqueeze(0)/(yita_c)),1))+0.5*torch.mean(torch.sum(1+logvar,1))
 
         return x_hat, recon_loss, Loss - recon_loss

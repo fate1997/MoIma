@@ -25,7 +25,6 @@ def test_chemicalvae():
     assert torch.isnan(output[0]).sum() == 0
     assert torch.isnan(output[1]).sum() == 0
     assert torch.isnan(output[2]).sum() == 0
-    assert output[0].size() == (2, 120, vocab_size)
     assert output[1].size() == (2, 64)
     assert output[2].size() == (2, 64)
     
@@ -59,7 +58,6 @@ def test_vade():
     assert torch.isnan(output[1]).sum() == 0
     assert torch.isnan(output[2]).sum() == 0
     assert torch.isnan(output[3]).sum() == 0
-    assert output[0].size() == (2, 120, vocab_size)
     assert output[1].size() == (2, 64)
     assert output[2].size() == (2, 64)
     assert output[3].size() == (2, 10)
@@ -68,10 +66,5 @@ def test_vade():
     assert isinstance(latent_repr, torch.Tensor)
     assert torch.isnan(latent_repr).sum() == 0
     assert latent_repr.size() == (2, 64)
-    
-    guassian_pdf_log = model.gaussian_pdfs_log(latent_repr, model.mu_c, model.logvar_c)
-    assert isinstance(guassian_pdf_log, torch.Tensor)
-    assert torch.isnan(guassian_pdf_log).sum() == 0
-    assert guassian_pdf_log.size() == (2, 10)
     
     PipeStorage.model['vade'] = model

@@ -12,9 +12,9 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 RDLogger.DisableLog('rdApp.*')
 
 
-class GenerationMetrics:
+class RegressionMetrics:
     AVAIL_METRICS = ['mse', 'rmse', 'mae', 'aard', 'r2']
-    def __init__(self, outputs: torch.Tensor, targets: torch.Tensor):
+    def __init__(self, targets: torch.Tensor, outputs: torch.Tensor):
         self.outputs = outputs.detach().cpu().numpy()
         self.targets = targets.detach().cpu().numpy()
     

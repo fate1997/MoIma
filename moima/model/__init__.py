@@ -14,6 +14,23 @@ MODEL_REGISTRY = {
 }
 
 
+def build_model(name: str=None, **kwargs) -> nn.Module:
+    """Build a model instance by name.
+    
+    Args:
+        name (str): Name of the model. If None, the name will be read from kwargs.
+        **kwargs: Arguments for the model.
+    
+    Returns:
+        A model instance.
+    """
+    if name is None:
+        name = kwargs.pop('name')
+    if name not in MODEL_REGISTRY:
+        raise ValueError(f"Dataset {name} is not available.")
+    return MODEL_REGISTRY[name](**kwargs)
+
+
 class ModelFactory:
     """Factory class for model."""
     avail = list(MODEL_REGISTRY.keys())

@@ -1,11 +1,21 @@
 from dataclasses import dataclass, field
 
+from moima.dataset import DATASET_REGISTRY
 from moima.pipeline.config import ArgType, DefaultConfig
+from moima.utils.loss_fn import LOSS_FN_REGISTRY
 
 
 @dataclass
 class VAEPipeConfig(DefaultConfig):
     """The configuration for the pipeline."""
+    # Dataset
+    vocab_path: str = field(default=None,
+                        metadata={'help': 'The path to the vocabulary.',
+                                  'type': ArgType.DATASET})
+    dataset_name: str = field(default='smiles_seq', 
+                              metadata={'help': 'Name of the dataset.',
+                                        'choices': DATASET_REGISTRY.keys(),
+                                        'type': ArgType.DATASET})
     
     # Featurizer
     seq_len: int = field(default=120,
@@ -36,6 +46,10 @@ class VAEPipeConfig(DefaultConfig):
                                       'type': ArgType.MODEL})
     
     # Loss_fn
+    loss_fn_name: str = field(default='vae_loss',
+                        metadata={'help': 'Name of the loss function.',
+                                'choices': LOSS_FN_REGISTRY.keys(),
+                                'type': ArgType.LOSS_FN})
     start_kl_weight: float = field(default=0.0,
                                    metadata={'help': 'The start kl weight.',
                                              'type': ArgType.LOSS_FN})

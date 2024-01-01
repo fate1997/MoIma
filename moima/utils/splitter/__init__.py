@@ -8,22 +8,18 @@ SPLITTER_REGISTRY = {
 }
 
 
-class SplitterFactory:
-    """Factory class for splitter."""
-    avail = list(SPLITTER_REGISTRY.keys())
-        
-    @staticmethod
-    def create(**kwargs) -> SplitterABC:
-        """Create a splitter instance by name.
-        
-        Args:
-            name (str): Name of the splitter.
-            **kwargs: Arguments for the splitter.
-        
-        Returns:
-            A splitter instance.
-        """
+def build_splitter(name: str=None, **kwargs) -> SplitterABC:
+    """Build a splitter instance by name.
+    
+    Args:
+        name (str): Name of the splitter. If None, the name will be read from kwargs.
+        **kwargs: Arguments for the splitter.
+    
+    Returns:
+        A splitter instance.
+    """
+    if name is None:
         name = kwargs.pop('name')
-        if name not in SPLITTER_REGISTRY:
-            raise ValueError(f"Dataset {name} is not available.")
-        return SPLITTER_REGISTRY[name](**kwargs)
+    if name not in SPLITTER_REGISTRY:
+        raise ValueError(f"Dataset {name} is not available.")
+    return SPLITTER_REGISTRY[name](**kwargs)

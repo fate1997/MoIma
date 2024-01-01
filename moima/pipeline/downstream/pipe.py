@@ -1,30 +1,36 @@
 from typing import Any, Dict
 
 import torch
+from tqdm import tqdm
 
 from moima.dataset._abc import DatasetABC
+from moima.dataset.descriptor_vec.dataset import DescDataset, VecBatch
+from moima.dataset.descriptor_vec.featurizer import DescFeaturizer
+from moima.pipeline import AVAILABLE_PIPELINES
 from moima.pipeline.config import DefaultConfig
 from moima.pipeline.downstream.config import DownstreamPipeConfig
 from moima.pipeline.pipe import PipeABC
-from moima.dataset.descriptor_vec.dataset import DescDataset
-from moima.dataset.descriptor_vec.featurizer import DescFeaturizer
-from tqdm import tqdm
-from moima.pipeline import AVAILABLE_PIPELINES
 
 
 class DownstreamPipe(PipeABC):
     def __init__(self, 
-                 config: DownstreamPipeConfig,  
-                 model_state_dict: Dict[str, Any] = None, 
-                 optimizer_state_dict: Dict[str, Any] = None,):
-        super().__init__(config, model_state_dict, optimizer_state_dict)
+                 config: DownstreamPipeConfig, 
+                 featurizer: DescFeaturizer = None,
+                 model_state_dict: Dict[str, Any] = None,
+                 optimizer_state_dict: Dict[str, Any] = None,
+                 is_training: bool = True):
+        super().__init__(config, 
+                         featurizer,
+                         model_state_dict, 
+                         optimizer_state_dict, 
+                         is_training)
 
-    def _forward_batch(self, batch):
+    def _forward_batch(self, batch: VecBatch):
         """Train the model for one iteration."""
         batch.to(self.device)
         output = self.model(batch)
-        loss = self.loss_fn(batch.y, output)
-        return output, loss
+        loss = self.loss_fn(batch.y, output).float()
+        return output, {'loss': loss}
     
     def _interested_info(self, batch, output):
         """Get the interested information."""
@@ -36,16 +42,18 @@ class DownstreamPipe(PipeABC):
         return {}
     
     def _desc_from_pretrained(self):
+        r"""Get the descriptors from the pretrained pipe."""
+        # Load the pretrained pipe
         pretrained_pipe_class = AVAILABLE_PIPELINES[self.config.pretrained_pipe_class]
         pretrained_pipe_path = self.config.pretrained_pipe_path
-        self.pretrained_pipe = pretrained_pipe_class.from_pretrained(pretrained_pipe_path)
-        pretrained_pipe = self.pretrained_pipe
+        pretrained_pipe = pretrained_pipe_class.from_pretrained(pretrained_pipe_path)
+        
+        # Build the dataset and loader for the pretrained pipe
         pretrained_pipe.config.raw_path = self.config.raw_path
-        pretrained_pipe.config.batch_size = 512
-        pretrained_pipe.config.vocab_path = self.config.vocab_path
         dataset = pretrained_pipe.build_dataset()
-        splitter = pretrained_pipe.build_splitter()
-        loader = splitter.create_loader(dataset)
+        loader = dataset.create_loader(batch_size=512)
+        
+        # Get the descriptors dict {smiles: desc}
         reprs = []
         smiles_list = []
         for batch in tqdm(loader, desc='Featurizing by pretrained pipe'):
@@ -61,16 +69,6 @@ class DownstreamPipe(PipeABC):
         featurizer_config = self.config.featurizer
         if 'dict' in self.config.mol_desc:
             desc_dict = self._desc_from_pretrained()
-            featurizer_config['additional_desc_dict'] = desc_dict
+            featurizer_config['addi_desc_dict'] = desc_dict
         featurizer_config.pop('name', None)
-        self.featurizer = DescFeaturizer(**featurizer_config)
-    
-    def build_dataset(self) -> DatasetABC:
-        """Build the dataset."""
-        desc_dataset = DescDataset(self.config.raw_path, 
-                                   self.config.label_col,
-                                   self.featurizer, 
-                                   processed_path=self.config.processed_path, 
-                                   force_reload=self.config.force_reload, 
-                                   save_processed=self.config.save_processed)
-        return desc_dataset
+        return DescFeaturizer(**featurizer_config)

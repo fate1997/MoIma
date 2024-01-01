@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 
+from moima.dataset import DATASET_REGISTRY
 from moima.pipeline.config import ArgType, DefaultConfig
+from moima.utils.loss_fn import LOSS_FN_REGISTRY
 
 
 @dataclass
@@ -13,6 +15,10 @@ class VaDEPipeConfig(DefaultConfig):
                                       'type': ArgType.FEATURZIER})
     
     # Dataset
+    dataset_name: str = field(default='smiles_seq', 
+                                metadata={'help': 'Name of the dataset.',
+                                        'choices': DATASET_REGISTRY.keys(),
+                                        'type': ArgType.DATASET})
     vocab_path: str = field(default=None,
                                 metadata={'help': 'The path to the vocabulary.',
                                           'type': ArgType.DATASET})
@@ -21,7 +27,7 @@ class VaDEPipeConfig(DefaultConfig):
     model_name: str = field(default='vade',
                             metadata={'help': 'The model name.',
                                       'type': ArgType.MODEL})
-    vocab_size: int = field(default=36,
+    vocab_size: int = field(default=40,
                             metadata={'help': 'The vocabulary size.',
                                       'type': ArgType.MODEL})
     enc_hidden_dim: int = field(default=292,
@@ -44,17 +50,12 @@ class VaDEPipeConfig(DefaultConfig):
                                       'type': ArgType.MODEL})
     
     # Loss_fn
-    end_kl_weight: float = field(default=0.0025,
-                            metadata={'help': 'The end kl weight.',
-                                      'type': ArgType.LOSS_FN})
-    end_center_weight: float = field(default=2.5,
-                            metadata={'help': 'The end center weight.',
-                                      'type': ArgType.LOSS_FN})
     loss_fn_name: str = field(default='vade_loss',
-                            metadata={'help': 'The loss function name.',
+                                metadata={'help': 'Name of the loss function.',
+                                        'choices': LOSS_FN_REGISTRY.keys(),
+                                        'type': ArgType.LOSS_FN})
+    kl_weight: float = field(default=1,
+                            metadata={'help': 'The kl weight.',
                                       'type': ArgType.LOSS_FN})
-    anneal_num_epochs: int = field(default=100,
-                                    metadata={'help': 'The number of epochs to anneal.',
-                                            'type': ArgType.LOSS_FN})
     
     
