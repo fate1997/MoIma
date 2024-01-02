@@ -12,8 +12,11 @@ from moima.dataset.descriptor_vec.featurizer import (DescFeaturizer, VecData,
                                                      _get_dict_from_csv,
                                                      _get_ecfp,
                                                      _get_rdkit_desc)
+from moima.dataset.mol_graph.atom_featurizer import AtomFeaturizer
+from moima.dataset.mol_graph.bond_featurizer import BondFeaturizer
 from moima.dataset.smiles_seq.data import SeqData
 from moima.dataset.smiles_seq.featurizer import SeqFeaturizer
+from moima.dataset.mol_graph.featurizer import GraphFeaturizer, GraphData
 
 
 @pytest.mark.parametrize("SMILES", ["CC(=O)OC1=CC=CC=C1C(=O)O", 
@@ -118,3 +121,56 @@ def test_rdkit_and_csv(smiles_batch, helpers):
     assert len(data_list[0].x) == len(featurizer.columns)
     
     helpers.remove_files(csv_path)
+
+
+def test_atom_featurizer():
+    mol = Chem.MolFromSmiles('CC(=O)OC1=CC=CC=C1C(=O)O')
+    atom = mol.GetAtomWithIdx(0)
+    
+    names = ['atomic_num', 'degree', 'formal_charge', 'chiral_tag', 
+             'hybridization', 'aromatic', 'num_Hs']
+    for name in names:
+        featurizer = AtomFeaturizer([name])
+        atom_features = featurizer(atom)
+        assert isinstance(atom_features, np.ndarray)
+        assert atom_features.ndim == 1
+        
+    featurizer = AtomFeaturizer(['atomic_num'], {'atomic_num': {'choices': [1, 6, 7]}})
+    atom_features = featurizer(atom)
+    assert atom_features.size == 4
+    
+    featurizer = AtomFeaturizer(names)
+    atom_features = featurizer(atom)
+    assert isinstance(atom_features, np.ndarray)
+    assert atom_features.ndim == 1
+
+
+def test_bond_featurizer():
+    mol = Chem.MolFromSmiles('CC(=O)OC1=CC=CC=C1C(=O)O')
+    bond = mol.GetBondWithIdx(0)
+    
+    names = ['bond_type', 'bond_is_conjugated', 'bond_is_in_ring']
+    for name in names:
+        featurizer = BondFeaturizer([name])
+        bond_features = featurizer(bond)
+        assert isinstance(bond_features, np.ndarray)
+        assert bond_features.ndim == 1
+    
+    featurizer = BondFeaturizer(names)
+    bond_features = featurizer(bond)
+    assert isinstance(bond_features, np.ndarray)
+    assert bond_features.ndim == 1
+
+
+def test_graph_featurizer(smiles_batch):
+    featurizer = GraphFeaturizer(['atomic_num', 'degree', 'formal_charge', 'chiral_tag',
+                                    'hybridization', 'aromatic', 'num_Hs'],
+                                     ['bond_type', 'bond_is_conjugated', 'bond_is_in_ring'],
+                                     {'atomic_num': {'choices': [1, 6, 7]}})
+    data_list = featurizer(smiles_batch)
+    assert len(data_list) == len(smiles_batch)
+    assert isinstance(data_list[0], GraphData)
+    assert data_list[0].edge_index.shape[0] == 2
+    assert data_list[0].x.shape[1] == featurizer.atom_featurizer.dim
+    assert data_list[0].edge_attr is not None
+    assert data_list[0].pos is None

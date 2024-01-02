@@ -25,7 +25,7 @@ class DownstreamPipe(PipeABC):
                          optimizer_state_dict, 
                          is_training)
 
-    def _forward_batch(self, batch: VecBatch):
+    def _forward_batch(self, batch):
         """Train the model for one iteration."""
         batch.to(self.device)
         output = self.model(batch)

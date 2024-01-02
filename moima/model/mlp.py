@@ -41,7 +41,7 @@ class MLP(nn.Module):
         
         self.layers.apply(init_weight)
         
-    def forward(self, batch: VecBatch) -> Tensor:
+    def forward(self, batch) -> Tensor:
         r"""Forward pass of :class:`MLP`.
 
         Args:

@@ -7,6 +7,8 @@ from moima.dataset import build_dataset
 from moima.dataset.descriptor_vec.dataset import DescDataset, VecBatch, VecData, DescFeaturizer
 from moima.dataset.smiles_seq.data import SeqBatch, SeqData
 from moima.dataset.smiles_seq.dataset import SeqDataset, SeqFeaturizer
+from moima.dataset.mol_graph.dataset import GraphDataset, GraphFeaturizer, GraphData
+from torch_geometric.data import Batch
 
 
 @pytest.fixture(scope='session')
@@ -95,9 +97,6 @@ def test_abc_and_seq_dataset(zinc100, helpers, seq_featurizer):
 
 @pytest.mark.order(1)
 def test_desc_dataset(zinc100, desc_featurizer):
-    featurizer = DescFeaturizer(mol_desc='ecfp,rdkit',
-                                ecfp_radius=4,
-                                ecfp_n_bits=2048)
     dataset = DescDataset(zinc100,
                           label_col='logP',
                           additional_cols=['qed', 'SAS'],
@@ -122,6 +121,28 @@ def test_desc_dataset(zinc100, desc_featurizer):
     
     PipeStorage.dataset['desc'] = dataset
 
+
+@pytest.mark.order(1)
+def test_graph_dataset(zinc100):
+    featurizer = GraphFeaturizer(atom_feature_names=['atomic_num'],
+                             bond_feature_names=['bond_type'],
+                             assign_pos=False)
+    dataset = GraphDataset(raw_path=zinc100,
+                        label_col=['logP'],
+                        featurizer=featurizer)
+    assert len(dataset) == 100
+    assert isinstance(dataset[0], GraphData)
+    assert dataset[0].x.shape == (dataset[0].num_nodes, featurizer.atom_featurizer.dim)
+    assert dataset[0].edge_index.shape == (2, dataset[0].num_edges)
+    assert dataset[0].edge_attr is not None
+    assert dataset[0].pos is None
+    assert dataset[0].y.shape == (1, )
+    
+    batch = next(iter(dataset.create_loader(batch_size=24)))
+    assert isinstance(batch, Batch)
+    assert batch.batch is not None
+    assert batch.batch.max() == 23
+    
 
 def test_dataset_factory(zinc100, desc_featurizer, seq_featurizer):
     seq_dataset = build_dataset(name='smiles_seq',
