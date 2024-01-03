@@ -17,11 +17,11 @@ class MLP(nn.Module):
     """
     def __init__(self, 
                  input_dim: int, 
-                 hidden_dim: int, 
-                 output_dim: int, 
-                 n_layers: int, 
-                 dropout: float, 
-                 activation: str):
+                 hidden_dim: int = 128, 
+                 output_dim: int = 1, 
+                 n_layers: int = 2, 
+                 dropout: float = 0.2, 
+                 activation: str = 'relu'):
         super().__init__()
         
         activation = get_activation(activation)

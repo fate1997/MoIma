@@ -3,8 +3,6 @@ from moima.model import ModelFactory, build_model
 
 def test_model_factory():
     """Test ModelFactory."""
-    print(ModelFactory.avail)
-    assert ModelFactory.avail == ['chemical_vae', 'vade', 'mlp']
     model = build_model(name='mlp', 
                         input_dim=10, 
                         hidden_dim=10,

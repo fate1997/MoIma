@@ -8,8 +8,16 @@ from torch import Tensor
 
 from moima.dataset._abc import FeaturizerABC
 from moima.pipeline.pipe import PipeABC
-from moima.pipeline.vade.config import VaDEPipeConfig
+from moima.pipeline.config import create_config_class
 from moima.dataset.smiles_seq.data import SeqBatch
+
+
+VaDEPipeConfig = create_config_class('VaDEPipeConfig',
+                                        'smiles_seq',
+                                        'vade',
+                                        'random',
+                                        'vade_loss')
+print(VaDEPipeConfig.__module__, __name__)
 
 
 class VaDEPipe(PipeABC):

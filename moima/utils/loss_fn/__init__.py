@@ -5,13 +5,14 @@ from torch import nn
 from ._abc import LossCalcABC
 from .vade_loss import VaDELossCalc
 from .vae_loss import VAELossCalc
+from .regression_loss import MSELossCalc, L1LossCalc, HuberLossCalc
 
 LOSS_FN_REGISTRY = {
     "vae_loss": VAELossCalc,
     "vade_loss": VaDELossCalc,
-    "mse": nn.MSELoss,
-    "l1": nn.L1Loss,
-    "huber": nn.SmoothL1Loss,
+    "mse": MSELossCalc,
+    "l1": L1LossCalc,
+    "huber": HuberLossCalc,
 }
 
 

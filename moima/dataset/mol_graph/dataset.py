@@ -54,6 +54,6 @@ class GraphDataset(DatasetABC):
             labels = labels.reshape(-1, 1)
         additional_kwargs = dict(zip(self.additional_cols,
                                     df[self.additional_cols].values.T))
-        additional_kwargs.update({'y': labels})
-        data_list = self.featurizer(mols, **additional_kwargs)        
+        additional_kwargs.update({'y': torch.FloatTensor(labels)})
+        data_list = self.featurizer(mols, **additional_kwargs)   
         return data_list

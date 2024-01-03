@@ -3,12 +3,18 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from moima.pipeline.vae.config import VAEPipeConfig
 from moima.pipeline.pipe import PipeABC
+from moima.pipeline.config import create_config_class
 from moima.dataset._abc import FeaturizerABC
 
 from typing import Any, Dict
 
+
+VAEPipeConfig = create_config_class('VAEPipeConfig',
+                                    'smiles_seq',
+                                    'chemical_vae',
+                                    'random',
+                                    'vae_loss')
 
 class VAEPipe(PipeABC):
     r"""Variational autoencoder pipeline.

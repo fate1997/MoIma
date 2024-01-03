@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 from torch.utils.data import DataLoader
 
-from moima.pipeline.downstream.pipe import DownstreamPipe, DownstreamPipeConfig
+from moima.pipeline.downstream.pipe import DownstreamPipe, create_downstream_config_class
 from moima.pipeline.vade import VaDEPipe, VaDEPipeConfig
 from moima.pipeline.vae import VAEPipe, VAEPipeConfig
 
@@ -68,6 +68,8 @@ def test_io(vae_pipe):
     assert vae_pipe.featurizer.vocab == loaded_pipe.featurizer.vocab
     for name, param in vae_pipe.model.named_parameters():
         assert param.data.equal(loaded_pipe.model.state_dict()[name])
+    
+    pytest.pretrained_path = pipe_path
         
         
 @pytest.mark.order(4)
@@ -109,8 +111,15 @@ def test_vade(zinc1k):
     assert isinstance(sampled_smiles[0], str)
 
 
-@pytest.mark.order(4)
+@pytest.mark.order(5)
 def test_downstream(zinc1k):
+    DownstreamPipeConfig = create_downstream_config_class(
+                                        "DownstreamPipeConfig",
+                                        dataset_name="desc_vec",
+                                        model_name='mlp',
+                                        splitter_name='random',
+                                        loss_fn_name='mse')
+    
     config = DownstreamPipeConfig(
         raw_path=zinc1k,
         input_dim=128,
@@ -122,9 +131,8 @@ def test_downstream(zinc1k):
         dataset_name='desc_vec',
         label_col="logP",
         mol_desc='addi_dict',
-        pretrained_pipe_class='VaDEPipe',
-        pretrained_pipe_path=os.path.join(pytest.EXAMPLE_PATH,
-                                          'VaDE-zinc1k-epoch-1998_17-24-31-12-2023.pt'))
+        pretrained_pipe_class='VAEPipe',
+        pretrained_pipe_path=pytest.pretrained_path)
     pipe = DownstreamPipe(config)
     
     # Test `desc_from_pretrained` function

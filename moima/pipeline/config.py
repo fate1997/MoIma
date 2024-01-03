@@ -1,12 +1,14 @@
 import argparse
-from dataclasses import dataclass, field, Field
-from enum import Enum
-from typing import Any, Dict, List
-import json
-import yaml
 import hashlib
+import inspect
+import json
+from dataclasses import Field, dataclass, field, make_dataclass
+from enum import Enum
+from typing import Any, Dict, List, Tuple, NewType
 
-from moima.dataset import DATASET_REGISTRY
+import yaml
+
+from moima.dataset import DATASET_REGISTRY, FEATURIZER_REGISTRY
 from moima.model import MODEL_REGISTRY
 from moima.utils.loss_fn import LOSS_FN_REGISTRY
 from moima.utils.splitter import SPLITTER_REGISTRY
@@ -14,7 +16,7 @@ from moima.utils.splitter import SPLITTER_REGISTRY
 
 class ArgType(Enum):
     DATASET=0
-    FEATURZIER=1
+    FEATURIZER=1
     MODEL=2
     SPLITTER=3
     LOSS_FN=4
@@ -22,7 +24,7 @@ class ArgType(Enum):
     SCHEDULER=6
     GENERAL=7
 
-NAME_BAG = ['dataset', 'model', 'splitter', 'loss_fn']
+NAME_BAG = ['dataset', 'model', 'splitter', 'loss_fn', 'featurizer']
 
 
 @dataclass
@@ -78,6 +80,12 @@ class DefaultConfig:
     save_processed: bool = field(default=False, 
                                  metadata={'help': 'Whether to save the processed data.',
                                            'type': ArgType.DATASET})
+    # Featurizer
+    featurizer_name: str = field(default=None,
+                                    metadata={'help': 'Name of the featurizer.',
+                                            'choices': FEATURIZER_REGISTRY.keys(),
+                                            'type': ArgType.FEATURIZER})
+    
     # Model
     model_name: str = field(default=None,
                             metadata={'help': 'Name of the model.',
@@ -133,6 +141,7 @@ class DefaultConfig:
     
     def __post_init__(self):
         r"""Set the default value of the fields to the input value."""
+        self.featurizer_name = self.dataset_name
         input_dict = self.__dict__
         for k, v in self.__dataclass_fields__.items():
             input_value = input_dict[k]
@@ -197,19 +206,20 @@ class DefaultConfig:
     @property
     def featurizer(self):
         r"""Get the featurizer group."""
-        result_dict = self.group(ArgType.FEATURZIER)
+        result_dict = self.group(ArgType.FEATURIZER)
         return result_dict
         
-    def group(self, type: ArgType) -> Dict[str, Any]:
+    def group(self, arg_type: ArgType) -> Dict[str, Any]:
         r"""Group the config according to the type."""
         result_dict = {}
         for k, v in self.__dataclass_fields__.items():
-            if v.metadata['type'] == type:
+            if v.metadata['type'] == arg_type:
                 if v.default != getattr(self, k):
                     result_dict[k] = getattr(self, k)
                 else:
                     result_dict[k] = v.default
-                if 'name' in k:
+                arg_name = arg_type.name.lower()+'_name'
+                if arg_name == k:
                     result_dict['name'] = result_dict.pop(k)
         return result_dict
         
@@ -274,3 +284,69 @@ class DefaultConfig:
                                 choices=v.metadata.get('choices', None))
         args = parser.parse_args()
         return cls(**vars(args))
+
+
+def get_arg_fields(arg_spec: inspect.FullArgSpec, 
+                   arg_type: ArgType,
+                   exclude_args: List[str]=[]) -> List[tuple]:
+    r"""Get the fields from the arg spec."""
+    fields_list = []
+    for i, arg in enumerate(reversed(arg_spec.args)):
+        if arg == 'self' or arg in exclude_args:
+            continue
+        i += 1
+        if arg_spec.defaults is not None and len(arg_spec.defaults) >= i:
+            default_value = arg_spec.defaults[-i]
+        else:
+            default_value = None
+        if default_value == []:
+            arg_field = field(default_factory=list,
+                            metadata={'type': arg_type})
+        elif default_value == {}:
+            arg_field = field(default_factory=dict,
+                            metadata={'type': arg_type})
+        elif default_value == ():
+            arg_field = field(default_factory=tuple,
+                            metadata={'type': arg_type})
+        else:
+            arg_field = field(default=default_value,
+                            metadata={'type': arg_type})
+        fields_list.append((arg, arg_spec.annotations[arg], arg_field))
+    return fields_list
+
+
+def create_config_class(class_name: str,
+                        dataset_name: str,
+                        model_name: str,
+                        splitter_name: str,
+                        loss_fn_name: str,
+                        addi_args: List[Tuple[str, type, Field]] = []):
+    dataset_arg_spec = inspect.getfullargspec(DATASET_REGISTRY[dataset_name])
+    model_arg_spec = inspect.getfullargspec(MODEL_REGISTRY[model_name])
+    splitter_arg_spec = inspect.getfullargspec(SPLITTER_REGISTRY[splitter_name])
+    loss_fn_arg_spec = inspect.getfullargspec(LOSS_FN_REGISTRY[loss_fn_name])
+    featurizer_arg_spec = inspect.getfullargspec(FEATURIZER_REGISTRY[dataset_name])
+    arg_fields = get_arg_fields(dataset_arg_spec, ArgType.DATASET, ['featurizer']) + \
+                 get_arg_fields(model_arg_spec, ArgType.MODEL) + \
+                 get_arg_fields(splitter_arg_spec, ArgType.SPLITTER) + \
+                 get_arg_fields(loss_fn_arg_spec, ArgType.LOSS_FN) + \
+                 get_arg_fields(featurizer_arg_spec, ArgType.FEATURIZER, ['vocab'])
+    loss_fn_field = ('loss_fn_name', str, field(default=loss_fn_name,
+                                               metadata={'type': ArgType.LOSS_FN,
+                                                         'choices': LOSS_FN_REGISTRY.keys()}))
+    dataset_field = ('dataset_name', str, field(default=dataset_name,
+                                                  metadata={'type': ArgType.DATASET,
+                                                            'choices': DATASET_REGISTRY.keys()}))
+    model_field = ('model_name', str, field(default=model_name,
+                                                metadata={'type': ArgType.MODEL,
+                                                            'choices': MODEL_REGISTRY.keys()}))
+    splitter_field = ('splitter_name', str, field(default=splitter_name,
+                                                        metadata={'type': ArgType.SPLITTER,
+                                                                    'choices': SPLITTER_REGISTRY.keys()}))
+    arg_fields = [loss_fn_field, dataset_field, model_field, splitter_field] + arg_fields
+    arg_fields += addi_args
+    
+    config_class = make_dataclass(class_name, arg_fields, bases=(DefaultConfig,))
+    
+    
+    return config_class

@@ -5,17 +5,46 @@ from tqdm import tqdm
 
 from moima.dataset._abc import DatasetABC
 from moima.dataset.descriptor_vec.dataset import DescDataset, VecBatch
-from moima.dataset.descriptor_vec.featurizer import DescFeaturizer
+from moima.dataset import FEATURIZER_REGISTRY, build_featurizer
 from moima.pipeline import AVAILABLE_PIPELINES
-from moima.pipeline.config import DefaultConfig
-from moima.pipeline.downstream.config import DownstreamPipeConfig
-from moima.pipeline.pipe import PipeABC
+# from moima.pipeline.downstream.config import DownstreamPipeConfig
+from moima.pipeline.pipe import PipeABC, FeaturizerABC
+import inspect
+from moima.pipeline.config import create_config_class, ArgType, DefaultConfig
+from dataclasses import field
+
+
+def create_downstream_config_class(class_name: str,
+                        dataset_name: str,
+                        model_name: str,
+                        splitter_name: str,
+                        loss_fn_name: str):
+    r"""Create the downstream config class."""
+    pretrained_pipe_class = ('pretrained_pipe_class', 
+                             str, 
+                             field(default='VaAEPipe',
+                                   metadata={'help': 'The pretrained pipeline class.',
+                                             'type': ArgType.GENERAL}))
+    pretrained_pipe_path = ('pretrained_pipe_path',
+                            str,
+                            field(default=None,
+                                  metadata={'help': 'The pretrained pipeline path.',
+                                            'type': ArgType.GENERAL}))
+    Config = create_config_class(class_name,
+                                    dataset_name,
+                                    model_name,
+                                    splitter_name,
+                                    loss_fn_name,
+                                    [pretrained_pipe_class, pretrained_pipe_path])
+    setattr(inspect.getmodule(DownstreamPipe), class_name, Config)
+    Config.__module__ = inspect.getmodule(DownstreamPipe).__name__
+    return Config                             
 
 
 class DownstreamPipe(PipeABC):
     def __init__(self, 
-                 config: DownstreamPipeConfig, 
-                 featurizer: DescFeaturizer = None,
+                 config: DefaultConfig, 
+                 featurizer: FeaturizerABC = None,
                  model_state_dict: Dict[str, Any] = None,
                  optimizer_state_dict: Dict[str, Any] = None,
                  is_training: bool = True):
@@ -29,7 +58,11 @@ class DownstreamPipe(PipeABC):
         """Train the model for one iteration."""
         batch.to(self.device)
         output = self.model(batch)
-        loss = self.loss_fn(batch.y, output).float()
+        if batch.y.ndim == 1:
+            y = batch.y.unsqueeze(-1)
+        else:
+            y = batch.y
+        loss = self.loss_fn(y, output).float()
         return output, {'loss': loss}
     
     def _interested_info(self, batch, output):
@@ -67,8 +100,9 @@ class DownstreamPipe(PipeABC):
     def build_featurizer(self):
         """Build the featurizer."""
         featurizer_config = self.config.featurizer
+        if getattr(self.config, 'dataset_name') != 'desc_vec':
+            return build_featurizer(**featurizer_config)
         if 'dict' in self.config.mol_desc:
             desc_dict = self._desc_from_pretrained()
             featurizer_config['addi_desc_dict'] = desc_dict
-        featurizer_config.pop('name', None)
-        return DescFeaturizer(**featurizer_config)
+        return build_featurizer(**featurizer_config)

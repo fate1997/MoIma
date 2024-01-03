@@ -20,7 +20,7 @@ class VAEPipeConfig(DefaultConfig):
     # Featurizer
     seq_len: int = field(default=120,
                             metadata={'help': 'The sequence length.',
-                                      'type': ArgType.FEATURZIER})
+                                      'type': ArgType.FEATURIZER})
     
     # Model
     model_name: str = field(default='chemical_vae',

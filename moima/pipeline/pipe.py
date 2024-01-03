@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
+import pathlib
+import inspect
 
 import numpy as np
 import torch
@@ -171,7 +173,6 @@ class PipeABC(ABC):
         """Load the featurizer."""
         # Build featurizer
         featurizer_config = self.config.featurizer
-        featurizer_config.update({'name': self.config.dataset_name})
         # Note that the featurizer will be updated from the dataset if the
         # dataset is loaded
         return build_featurizer(**featurizer_config)

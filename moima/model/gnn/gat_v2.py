@@ -15,8 +15,8 @@ def seed_all():
 
 class GATv2(nn.Module):
     def __init__(self, num_atom_features: int, hidden_dim: int, num_layers: int, 
-                 num_heads: int, pred_hidden_dim: int, pred_dropout: float, pred_layers:int,
-                 activation='prelu', residual: bool = True, num_tasks: int = 1,
+                 num_heads: int, pred_hidden_dim: int=128, pred_dropout: float=0.2, pred_layers:int=2,
+                 activation: str='prelu', residual: bool = True, num_tasks: int = 1,
                  bias: bool = True, dropout: float = 0.1):
         super(GATv2, self).__init__()
 

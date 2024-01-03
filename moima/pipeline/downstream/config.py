@@ -39,16 +39,16 @@ class DownstreamPipeConfig(DefaultConfig):
     # Featurizer
     mol_desc: str = field(default='ecfp',
                     metadata={'help': 'The descriptor name.',
-                                'type': ArgType.FEATURZIER})
+                                'type': ArgType.FEATURIZER})
     ecfp_radius: int = field(default=4,
                             metadata={'help': 'The ECFP radius.',
-                                      'type': ArgType.FEATURZIER})
+                                      'type': ArgType.FEATURIZER})
     ecfp_n_bits: int = field(default=2048,
                             metadata={'help': 'The ECFP number of bits.',
-                                      'type': ArgType.FEATURZIER})
+                                      'type': ArgType.FEATURIZER})
     desc_csv_path: str = field(default=None,
                             metadata={'help': 'The descriptor csv path.',
-                                      'type': ArgType.FEATURZIER})
+                                      'type': ArgType.FEATURIZER})
 
     
     # General
@@ -58,9 +58,8 @@ class DownstreamPipeConfig(DefaultConfig):
     pretrained_pipe_path: str = field(default=None,
                             metadata={'help': 'The pretrained pipeline path.',
                                       'type': ArgType.GENERAL})
-    
     # Loss
-    loss_name: str = field(default='mse',
+    loss_fn_name: str = field(default='mse',
                             metadata={'help': 'The loss name.',
                                       'type': ArgType.LOSS_FN})
     
