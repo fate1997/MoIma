@@ -155,7 +155,8 @@ class DefaultConfig:
         hash_dict = self.__dict__
         if exclude is not None:
             for key in exclude:
-                hash_dict.pop(key)
+                if key in hash_dict:
+                    hash_dict.pop(key)
         encoded = json.dumps(hash_dict, sort_keys=True).encode()
         dhash.update(encoded)
         return int(dhash.hexdigest(), 16) % (10 ** 8)
@@ -284,6 +285,20 @@ class DefaultConfig:
                                 choices=v.metadata.get('choices', None))
         args = parser.parse_args()
         return cls(**vars(args))
+    
+    def update_from_args(self):
+        r"""Update the config from the command line arguments."""
+        parser =  argparse.ArgumentParser(description='Parser For Arguments', 
+                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        for k, v in self.__dataclass_fields__.items():
+            parser.add_argument(f'--{k}', 
+                                type=v.type, 
+                                default=v.default, 
+                                help=v.metadata.get('help', None),
+                                choices=v.metadata.get('choices', None))
+        args = parser.parse_args()
+        for k, v in vars(args).items():
+            setattr(self, k, v)
 
 
 def get_arg_fields(arg_spec: inspect.FullArgSpec, 

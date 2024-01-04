@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod, abstractproperty
-from typing import List
+from typing import List, Callable, Any
 
 import numpy as np
 import pandas as pd
@@ -54,7 +54,9 @@ class FeaturizerABC(ABC):
             for key, value in kwargs.items():
                 assign_value = value[i]
                 if not isinstance(value[i], str):
-                    assign_value = torch.tensor(value[i])
+                    assign_value = torch.as_tensor(value[i])
+                    if assign_value.ndim == 1:
+                        assign_value = assign_value.unsqueeze(-1)
                 setattr(data, key, assign_value)
             data_list.append(data)
         return data_list        
@@ -95,6 +97,7 @@ class DatasetABC(Dataset):
         self.featurizer = featurizer
         self.force_reload = force_reload
         self.save_processed = save_processed
+        self.processed_path = processed_path
         
         if processed_path is None:
             processed_path = os.path.splitext(raw_path)[0] + '.pt'
@@ -103,9 +106,8 @@ class DatasetABC(Dataset):
             self.data_list = torch.load(processed_path)
         else:
             self.data_list = self.prepare()
-
-        if save_processed:
-            torch.save(self.data_list, processed_path)
+            if save_processed:
+                torch.save(self.data_list, processed_path)
     
     def __repr__(self) -> str:
         r"""Return the representation of the dataset."""
@@ -133,6 +135,19 @@ class DatasetABC(Dataset):
             raise ValueError('No column contains "smiles"')
         smiles_col = df.columns[smiles_col]
         return smiles_col
+    
+    def filter(self, drop_ids: List[int]):
+        filtered_data_list = [data for i, data in enumerate(self.data_list) if i not in drop_ids]
+        self.data_list = filtered_data_list
+    
+    def apply_transform(self, func: Callable[[DataABC, Any], DataABC], **kwargs):
+        for i, data in enumerate(self.data_list):
+            self.data_list[i] = func(data, **kwargs)
+    
+    def save(self, path: str=None):
+        if path is None:
+            path = self.processed_path
+        torch.save(self.data_list, path)    
     
     def len(self) -> int:
         r"""Return the length of the dataset."""

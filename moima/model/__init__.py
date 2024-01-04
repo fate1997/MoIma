@@ -7,12 +7,14 @@ from .mlp import MLP
 from .vae.chemical_vae import ChemicalVAE
 from .vae.vade import VaDE
 from .gnn.gat_v2 import GATv2
+from .gnn.dimenet import DimeNet
 
 MODEL_REGISTRY = {
     "chemical_vae": ChemicalVAE,
     "vade": VaDE,
     "mlp": MLP,
     "gat_v2": GATv2,
+    "dimenet": DimeNet,
 }
 
 

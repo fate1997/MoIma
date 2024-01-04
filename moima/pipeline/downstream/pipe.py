@@ -12,6 +12,7 @@ from moima.pipeline.pipe import PipeABC, FeaturizerABC
 import inspect
 from moima.pipeline.config import create_config_class, ArgType, DefaultConfig
 from dataclasses import field
+from moima.utils.evaluator.regression import RegressionMetrics
 
 
 def create_downstream_config_class(class_name: str,
@@ -58,16 +59,16 @@ class DownstreamPipe(PipeABC):
         """Train the model for one iteration."""
         batch.to(self.device)
         output = self.model(batch)
-        if batch.y.ndim == 1:
-            y = batch.y.unsqueeze(-1)
-        else:
-            y = batch.y
+        y = batch.y
         loss = self.loss_fn(y, output).float()
         return output, {'loss': loss}
     
-    def _interested_info(self, batch, output):
+    def set_interested_info(self, batch, output):
         """Get the interested information."""
-        return {}
+        return 
+        results = self.batch_flatten(self.loader['val'], ['y'], return_numpy=True)
+        metrics = RegressionMetrics(results['y'], results['output'])
+        self.interested_info.update({'val_MAE': metrics.mae})
     
     @property
     def custom_saveitems(self) -> Dict[str, Any]:

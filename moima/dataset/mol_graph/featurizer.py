@@ -37,7 +37,7 @@ class GraphFeaturizer(FeaturizerABC):
         if mol.GetNumConformers() == 0:
             return
         else:
-            return mol.GetConformer().GetPositions()
+            return torch.as_tensor(mol.GetConformer().GetPositions()).float()
     
     def encode(self, mol: MolRepr) -> GraphData:
         if isinstance(mol, str):
@@ -48,9 +48,12 @@ class GraphFeaturizer(FeaturizerABC):
         
         # Atom features
         atom_features = []
+        z = []
         for atom in mol.GetAtoms():
             atom_features.append(self.atom_featurizer(atom))
+            z.append(atom.GetAtomicNum())
         atom_features = torch.from_numpy(np.stack(atom_features, axis=0)).float()
+        z = torch.tensor(z, dtype=torch.long)
         
         # Edge index
         adj = Chem.GetAdjacencyMatrix(mol)
@@ -59,8 +62,8 @@ class GraphFeaturizer(FeaturizerABC):
         
         # Bond features
         bond_features = []
-        for bond in mol.GetBonds():
-            bond_features.append(self.bond_featurizer(bond))
+        for i, j in zip(edge_index[0].tolist(), edge_index[1].tolist()):
+                bond_features.append(self.bond_featurizer(mol.GetBondBetweenAtoms(i, j)))
         bond_features = torch.from_numpy(np.stack(bond_features, axis=0))
         
         # Get positions
@@ -74,7 +77,8 @@ class GraphFeaturizer(FeaturizerABC):
                                edge_index=edge_index, 
                                edge_attr=bond_features,
                                smiles=smiles,
-                               pos=pos)
+                               pos=pos,
+                               z=z)
         return graph_data
 
     @property

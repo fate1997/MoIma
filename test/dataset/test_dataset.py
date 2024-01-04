@@ -105,7 +105,7 @@ def test_desc_dataset(zinc100, desc_featurizer):
                           save_processed=False)
     assert len(dataset) == 100
     assert isinstance(dataset[0], VecData)
-    assert dataset[0].y.shape == (1, )
+    assert dataset[0].y.shape == (1, 1)
     assert hasattr(dataset[0], 'qed')
     assert hasattr(dataset[0], 'SAS')
     assert len(dataset.featurizer.columns) == dataset[0].x.shape[0]
@@ -136,7 +136,7 @@ def test_graph_dataset(zinc100):
     assert dataset[0].edge_index.shape == (2, dataset[0].num_edges)
     assert dataset[0].edge_attr is not None
     assert dataset[0].pos is None
-    assert dataset[0].y.shape == (1, )
+    assert dataset[0].y.shape == (1, 1)
     
     batch = next(iter(dataset.create_loader(batch_size=24)))
     assert isinstance(batch, Batch)
@@ -164,5 +164,5 @@ def test_dataset_factory(zinc100, desc_featurizer, seq_featurizer):
     desc_dataset = build_dataset(name='desc_vec', **kwargs)
     assert isinstance(desc_dataset, DescDataset)
     assert len(desc_dataset) == 100
-    assert desc_dataset[0].y.shape == (1, )
+    assert desc_dataset[0].y.shape == (1, 1)
     assert desc_dataset[0].x.shape == (2259, )

@@ -31,7 +31,7 @@ class DescDataset(DatasetABC):
             y.append(data.y)
             smiles.append(data.smiles)
         x = torch.stack(x, dim=0)
-        y = torch.stack(y, dim=0)
+        y = torch.cat(y, dim=0)
         
         result_batch = VecBatch(x, y, smiles)
         for key in batch[0].__dict__:

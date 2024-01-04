@@ -55,6 +55,9 @@ class VaDEPipe(PipeABC):
         info['Reconstruction'] = self.featurizer.decode(x_hat[0], is_raw=False)
         self.interested_info.update(info)
         return x_hat, loss_dict
+    
+    def set_interested_info(self, batch, output: Tensor):
+        return super().set_interested_info(batch, output)
         
     def pretrain(self, pre_epoch: int=50, retrain: bool=False) -> str:
         dataloader = self.loader['train']

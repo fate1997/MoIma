@@ -1,11 +1,11 @@
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from moima.pipeline.pipe import PipeABC
 from moima.pipeline.config import create_config_class
-from moima.dataset._abc import FeaturizerABC
+from moima.dataset._abc import DataABC, FeaturizerABC
 
 from typing import Any, Dict
 
@@ -47,6 +47,9 @@ class VAEPipe(PipeABC):
         info['Reconstruction'] = self.featurizer.decode(x_hat[0], is_raw=False)
         self.interested_info.update(info)
         return x_hat, loss
+    
+    def set_interested_info(self, batch: DataABC, output: Tensor):
+        return super().set_interested_info(batch, output)
     
     def sample(self, num_samples: int=10):
         self.model.eval()

@@ -127,6 +127,11 @@ class PipeABC(ABC):
             to add logging information by setting the `self.interested_info`.
         """
     
+    @abstractmethod
+    def set_interested_info(self, batch: DataABC, output: Tensor):
+        """Get the interested information."""
+        return {}
+    
     def build_workspace(self) -> str:
         """The workspace of the pipeline."""
         hash_config = self.config.get_hash_key(exclude=self.featurizer.arg4model.keys())
@@ -198,7 +203,6 @@ class PipeABC(ABC):
         self.model.eval()
         results = defaultdict(list)
         for batch in loader:
-            print(batch)
             output, _ = self._forward_batch(batch)
             results['output'].append(output)
             for item in register_items:
@@ -210,7 +214,7 @@ class PipeABC(ABC):
             else:    
                 concat_values = torch.cat(v, dim=0)
             if return_numpy and isinstance(concat_values, Tensor):
-                concat_values = concat_values.numpy()
+                concat_values = concat_values.detach().cpu().numpy()
             results[k] = concat_values
         return results
     
@@ -248,6 +252,7 @@ class PipeABC(ABC):
                 
                 if current_iter % self.config.log_interval == 0 or current_iter == total_iter:
                     default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'
+                    self.set_interested_info(batch, output)
                     loss_dict.update(self.interested_info)
                     print_items = []
                     for k, v in loss_dict.items():
