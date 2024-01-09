@@ -1,9 +1,9 @@
+import argparse
+
 import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import SDWriter
-import argparse
-
 
 HAR2EV = 27.211386246
 KCALMOL2EV = 0.04336414

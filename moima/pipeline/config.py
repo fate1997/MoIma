@@ -138,6 +138,12 @@ class DefaultConfig:
     lr: float = field(default=1e-3,
                         metadata={'help': 'The learning rate.',
                                 'type': ArgType.GENERAL})
+    patience: int = field(default=100,
+                        metadata={'help': 'The patience of early stop.',
+                        'type': ArgType.GENERAL})
+    early_stop_metric: str = field(default='val_MAE',
+                        metadata={'help': 'The metric of early stop.',
+                        'type': ArgType.GENERAL})
     
     def __post_init__(self):
         r"""Set the default value of the fields to the input value."""

@@ -65,7 +65,6 @@ class DownstreamPipe(PipeABC):
     
     def set_interested_info(self, batch, output):
         """Get the interested information."""
-        return 
         results = self.batch_flatten(self.loader['val'], ['y'], return_numpy=True)
         metrics = RegressionMetrics(results['y'], results['output'])
         self.interested_info.update({'val_MAE': metrics.mae})

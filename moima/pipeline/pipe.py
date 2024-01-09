@@ -17,7 +17,7 @@ from moima.dataset import build_dataset, build_featurizer
 from moima.dataset._abc import DataABC, DatasetABC, FeaturizerABC
 from moima.model import ModelFactory
 from moima.pipeline.config import DefaultConfig
-from moima.utils._util import get_logger
+from moima.utils._util import get_logger, EarlyStopping
 from moima.utils.loss_fn import build_loss_fn
 from moima.utils.splitter import build_splitter
 
@@ -168,7 +168,7 @@ class PipeABC(ABC):
     
     def build_model(self, state_dict: Dict[str, Any] = None) -> nn.Module:
         """Load the model."""
-        self.logger.info(f"{self.config.model} Model Loading".center(60, "-"))
+        self.logger.info(f"Model Loading".center(60, "-"))
         model = ModelFactory.create(**self.config.model).to(self.device)
         if state_dict is not None:
             model.load_state_dict(state_dict)
@@ -204,9 +204,12 @@ class PipeABC(ABC):
         results = defaultdict(list)
         for batch in loader:
             output, _ = self._forward_batch(batch)
-            results['output'].append(output)
+            results['output'].append(output.detach().cpu())
             for item in register_items:
-                results[item].append(getattr(batch, item))
+                value = getattr(batch, item)
+                if isinstance(value, Tensor):
+                    value = value.detach().cpu()
+                results[item].append(value)
         for k, v in results.items():
             if not isinstance(v[0], Tensor):
                 v = np.array(v, dtype=object)
@@ -225,7 +228,11 @@ class PipeABC(ABC):
         self.model.train()
         if n_epoch is None:
             n_epoch = self.config.num_epochs
-        total_iter = len(self.loader["train"].dataset) // self.loader["train"].batch_size * n_epoch
+        total_iter = len(self.loader["train"]) * n_epoch
+        early_stopping = EarlyStopping(patience=self.config.patience,
+                                       save_func=self.save)
+        do_early_stop = self.config.patience > 0
+        is_early_stop = False
         starting_time = time.time()
         current_iter = 0
         initial_epoch = self.current_epoch
@@ -250,9 +257,9 @@ class PipeABC(ABC):
                 clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()             
                 
+                self.set_interested_info(batch, output)
                 if current_iter % self.config.log_interval == 0 or current_iter == total_iter:
                     default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'
-                    self.set_interested_info(batch, output)
                     loss_dict.update(self.interested_info)
                     print_items = []
                     for k, v in loss_dict.items():
@@ -265,15 +272,32 @@ class PipeABC(ABC):
                     info = default_info + ''.join(print_items)
                     self.logger.info(info)
                     self.training_trace[current_iter] = loss_dict
-                if current_iter % self.config.save_interval == 0:
+                
+                # Early stopping
+                early_stopping(self.interested_info[self.config.early_stop_metric])
+                if do_early_stop and early_stopping.early_stop:
+                    self.logger.info(f"Early stopping at epoch {epoch}, at step {current_iter}.")
+                    is_early_stop = True
+                    break
+                
+                # Save the model normally
+                if not do_early_stop and \
+                    current_iter % self.config.save_interval == 0:
                     self.save()
+            
+            if is_early_stop:
+                break
         
-        self.save()
+        if do_early_stop:
+            self.logger.info(f"Loading the best model from {early_stopping.last_save_path}")
+            self.model.load_state_dict(torch.load(early_stopping.last_save_path)['model_state_dict'])
+        else:
+            self.save()
         
         time_elapsed = (time.time() - starting_time) / 60
         self.logger.info(f"Training finished in {time_elapsed:.2f} minutes")
     
-    def save(self, name: str=None) -> str:
+    def save(self, name: str=None, verbose: bool=True) -> str:
         """Save the necessary information to reproduce the pipeline."""
         basic_info = {
             'config': self.config,
@@ -293,5 +317,6 @@ class PipeABC(ABC):
         save_path = os.path.join(ckpt_folder, name)
         
         torch.save(basic_info, save_path)
-        self.logger.info(f"Pipeline saved to {save_path}")
+        if verbose:
+            self.logger.info(f"Pipeline saved to {save_path}")
         return save_path
