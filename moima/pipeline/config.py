@@ -12,6 +12,7 @@ from moima.dataset import DATASET_REGISTRY, FEATURIZER_REGISTRY
 from moima.model import MODEL_REGISTRY
 from moima.utils.loss_fn import LOSS_FN_REGISTRY
 from moima.utils.splitter import SPLITTER_REGISTRY
+from moima.utils.schedulers import SCHEDULER_REGISTRY
 
 
 class ArgType(Enum):
@@ -24,7 +25,7 @@ class ArgType(Enum):
     SCHEDULER=6
     GENERAL=7
 
-NAME_BAG = ['dataset', 'model', 'splitter', 'loss_fn', 'featurizer']
+NAME_BAG = ['dataset', 'model', 'splitter', 'loss_fn', 'featurizer', 'scheduler']
 
 
 @dataclass
@@ -144,6 +145,15 @@ class DefaultConfig:
     early_stop_metric: str = field(default='val_MAE',
                         metadata={'help': 'The metric of early stop.',
                         'type': ArgType.GENERAL})
+    in_step_mode: bool = field(default=False,
+                        metadata={'help': 'Whether to log/save/early_stop in step mode.',
+                        'type': ArgType.GENERAL})
+    
+    # Scheduler
+    scheduler_name: str = field(default=None,
+                                metadata={'help': 'Name of the scheduler.',
+                                        'choices': SCHEDULER_REGISTRY.keys(),
+                                        'type': ArgType.SCHEDULER})
     
     def __post_init__(self):
         r"""Set the default value of the fields to the input value."""
@@ -332,7 +342,8 @@ def get_arg_fields(arg_spec: inspect.FullArgSpec,
         else:
             arg_field = field(default=default_value,
                             metadata={'type': arg_type})
-        fields_list.append((arg, arg_spec.annotations[arg], arg_field))
+        annt = arg_spec.annotations[arg] if arg in arg_spec.annotations else Any
+        fields_list.append((arg, annt, arg_field))
     return fields_list
 
 
@@ -341,17 +352,21 @@ def create_config_class(class_name: str,
                         model_name: str,
                         splitter_name: str,
                         loss_fn_name: str,
+                        scheduler_name: str,
                         addi_args: List[Tuple[str, type, Field]] = []):
+    print(scheduler_name)
     dataset_arg_spec = inspect.getfullargspec(DATASET_REGISTRY[dataset_name])
     model_arg_spec = inspect.getfullargspec(MODEL_REGISTRY[model_name])
     splitter_arg_spec = inspect.getfullargspec(SPLITTER_REGISTRY[splitter_name])
     loss_fn_arg_spec = inspect.getfullargspec(LOSS_FN_REGISTRY[loss_fn_name])
     featurizer_arg_spec = inspect.getfullargspec(FEATURIZER_REGISTRY[dataset_name])
+    scheduler_arg_spec = inspect.getfullargspec(SCHEDULER_REGISTRY[scheduler_name])
     arg_fields = get_arg_fields(dataset_arg_spec, ArgType.DATASET, ['featurizer']) + \
                  get_arg_fields(model_arg_spec, ArgType.MODEL) + \
                  get_arg_fields(splitter_arg_spec, ArgType.SPLITTER) + \
                  get_arg_fields(loss_fn_arg_spec, ArgType.LOSS_FN) + \
-                 get_arg_fields(featurizer_arg_spec, ArgType.FEATURIZER, ['vocab'])
+                 get_arg_fields(featurizer_arg_spec, ArgType.FEATURIZER, ['vocab']) + \
+                 get_arg_fields(scheduler_arg_spec, ArgType.SCHEDULER, ['optimizer'])
     loss_fn_field = ('loss_fn_name', str, field(default=loss_fn_name,
                                                metadata={'type': ArgType.LOSS_FN,
                                                          'choices': LOSS_FN_REGISTRY.keys()}))
@@ -364,7 +379,10 @@ def create_config_class(class_name: str,
     splitter_field = ('splitter_name', str, field(default=splitter_name,
                                                         metadata={'type': ArgType.SPLITTER,
                                                                     'choices': SPLITTER_REGISTRY.keys()}))
-    arg_fields = [loss_fn_field, dataset_field, model_field, splitter_field] + arg_fields
+    scheduler_field = ('scheduler_name', str, field(default=scheduler_name,
+                                                        metadata={'type': ArgType.SCHEDULER,
+                                                                    'choices': SCHEDULER_REGISTRY.keys()}))
+    arg_fields = [loss_fn_field, dataset_field, model_field, splitter_field, scheduler_field] + arg_fields
     arg_fields += addi_args
     
     config_class = make_dataclass(class_name, arg_fields, bases=(DefaultConfig,))

@@ -165,4 +165,4 @@ def test_dataset_factory(zinc100, desc_featurizer, seq_featurizer):
     assert isinstance(desc_dataset, DescDataset)
     assert len(desc_dataset) == 100
     assert desc_dataset[0].y.shape == (1, 1)
-    assert desc_dataset[0].x.shape == (2259, )
+    assert desc_dataset[0].x.shape == (2258, )

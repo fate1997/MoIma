@@ -20,6 +20,7 @@ from moima.pipeline.config import DefaultConfig
 from moima.utils._util import get_logger, EarlyStopping
 from moima.utils.loss_fn import build_loss_fn
 from moima.utils.splitter import build_splitter
+from moima.utils.schedulers import build_scheduler
 from tqdm import tqdm
 
 
@@ -72,6 +73,7 @@ class PipeABC(ABC):
                  featurizer: FeaturizerABC = None,
                  model_state_dict: Dict[str, Any] = None,
                  optimizer_state_dict: Dict[str, Any] = None,
+                 scheduler_state_dict: Dict[str, Any] = None,
                  is_training: bool = True):
         # Load the config and save it to the workspace
         self.config = config
@@ -79,6 +81,7 @@ class PipeABC(ABC):
         # Set attributes
         self.device =  self.config.device
         self.n_epoch =  self.config.num_epochs
+        self.in_step_mode = False
         
         if featurizer is not None:
             self.featurizer = featurizer
@@ -97,15 +100,16 @@ class PipeABC(ABC):
             self.current_epoch = 0
             self.training_trace = {}
             self.interested_info = {}
-        
         # Update the model config according to the featurizer
         for arg, value in self.featurizer.arg4model.items():
             setattr(self.config, arg, value)
         self.model = self.build_model(model_state_dict)
-        
         # Build the optimizer
         self.optimizer = self.build_optimizer(optimizer_state_dict)
-        
+        # Build the scheduler
+        scheduler_args = self.config.scheduler
+        scheduler_args.update({'optimizer': self.optimizer})
+        self.scheduler = build_scheduler(**scheduler_args)
         # Save the config
         self.config.to_yaml(os.path.join(self.workspace, 'config.yaml'))
       
@@ -129,7 +133,7 @@ class PipeABC(ABC):
         """
     
     @abstractmethod
-    def set_interested_info(self, batch: DataABC, output: Tensor):
+    def set_interested_info(self, **kwargs):
         """Get the interested information."""
         return {}
     
@@ -240,53 +244,57 @@ class PipeABC(ABC):
         for epoch in range(n_epoch):
             self.current_epoch = epoch + initial_epoch
             for batch in self.loader["train"]:
+                """
                 for name, params in self.model.named_parameters():
                     if torch.isnan(params).any():
                         print(current_iter, name, params)
                         raise ValueError
+                """
                 current_iter += 1
-                
                 output, loss_dict = self._forward_batch(batch)
                 loss = loss_dict['loss']
+                """
                 if torch.isnan(loss):
                     self.save(f'{current_iter}-loss-nan.pt')
                     print(current_iter, loss)
                     raise ValueError
-
+                """
+                # Step the scheduler
+                if self.in_step_mode and self.scheduler is not None:
+                    self.scheduler.step()
+                # Backward
                 self.optimizer.zero_grad()
                 loss.backward()
                 clip_grad_norm_(self.model.parameters(), 50)
-                self.optimizer.step()             
-                
+                self.optimizer.step()
+                # Save the model normally other than saving in early stopping
+                if not do_early_stop and \
+                    current_iter % self.config.save_interval == 0:
+                    self.save()
+                # Log the information in mini-batch if in step mode
+                if not self.in_step_mode:
+                    continue
                 if current_iter % self.config.log_interval == 0 or current_iter == total_iter:
-                    self.set_interested_info(batch, output)
-                    default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'
-                    loss_dict.update(self.interested_info)
-                    print_items = []
-                    for k, v in loss_dict.items():
-                        if isinstance(v, Tensor):
-                            v = v.item()
-                        if type(v) is float:
-                            print_items.append(f'[{k}: {round(v, 4)}]')
-                        else:
-                            print_items.append(f'[{k}: {v}]')
-                    info = default_info + ''.join(print_items)
-                    self.logger.info(info)
-                    self.training_trace[current_iter] = loss_dict
-                
-                # Early stopping
+                    self.set_interested_info()
+                    self._log(epoch, current_iter, total_iter, loss_dict)
+                # Early stopping in mini-batch if in step mode
                 if do_early_stop: 
                     early_stopping(self.interested_info[self.config.early_stop_metric])
                 if do_early_stop and early_stopping.early_stop:
                     self.logger.info(f"Early stopping at epoch {epoch}, at step {current_iter}.")
                     is_early_stop = True
                     break
+            # Log the information in epoch if not in step mode
+            if not self.in_step_mode:
                 
-                # Save the model normally
-                if not do_early_stop and \
-                    current_iter % self.config.save_interval == 0:
-                    self.save()
             
+            # Early stopping in epoch if not in step mode
+            if not self.in_step_mode and do_early_stop:
+                early_stopping(self.interested_info[self.config.early_stop_metric])
+                if early_stopping.early_stop:
+                    self.logger.info(f"Early stopping at epoch {epoch}.")
+                    is_early_stop = True
+                    break
             if is_early_stop:
                 break
         
@@ -298,6 +306,21 @@ class PipeABC(ABC):
         
         time_elapsed = (time.time() - starting_time) / 60
         self.logger.info(f"Training finished in {time_elapsed:.2f} minutes")
+    
+    def _log(self, epoch: int, current_iter: int, total_iter: int, loss_dict: Dict[str, Any]):
+        default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'
+        loss_dict.update(self.interested_info)
+        print_items = []
+        for k, v in loss_dict.items():
+            if isinstance(v, Tensor):
+                v = v.item()
+            if type(v) is float:
+                print_items.append(f'[{k}: {round(v, 4)}]')
+            else:
+                print_items.append(f'[{k}: {v}]')
+        info = default_info + ''.join(print_items)
+        self.logger.info(info)
+        self.training_trace[current_iter] = loss_dict
     
     def save(self, name: str=None, verbose: bool=True) -> str:
         """Save the necessary information to reproduce the pipeline."""

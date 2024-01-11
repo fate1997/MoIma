@@ -14,7 +14,8 @@ VAEPipeConfig = create_config_class('VAEPipeConfig',
                                     'smiles_seq',
                                     'chemical_vae',
                                     'random',
-                                    'vae_loss')
+                                    'vae_loss',
+                                    'linear')
 
 class VAEPipe(PipeABC):
     r"""Variational autoencoder pipeline.
