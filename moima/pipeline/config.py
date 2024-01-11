@@ -138,7 +138,7 @@ class DefaultConfig:
     lr: float = field(default=1e-3,
                         metadata={'help': 'The learning rate.',
                                 'type': ArgType.GENERAL})
-    patience: int = field(default=100,
+    patience: int = field(default=-1,
                         metadata={'help': 'The patience of early stop.',
                         'type': ArgType.GENERAL})
     early_stop_metric: str = field(default='val_MAE',
@@ -369,5 +369,6 @@ def create_config_class(class_name: str,
     
     config_class = make_dataclass(class_name, arg_fields, bases=(DefaultConfig,))
     
-    
+    setattr(inspect.getmodule(DefaultConfig), class_name, config_class)
+    config_class.__module__ = inspect.getmodule(DefaultConfig).__name__
     return config_class

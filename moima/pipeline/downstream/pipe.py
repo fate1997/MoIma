@@ -55,13 +55,15 @@ class DownstreamPipe(PipeABC):
                          optimizer_state_dict, 
                          is_training)
 
-    def _forward_batch(self, batch):
+    def _forward_batch(self, batch, calc_loss=True):
         """Train the model for one iteration."""
         batch.to(self.device)
         output = self.model(batch)
         y = batch.y
-        loss = self.loss_fn(y, output).float()
-        return output, {'loss': loss}
+        if calc_loss:
+            loss = self.loss_fn(y, output).float()
+            return output, {'loss': loss}
+        return output, {}
     
     def set_interested_info(self, batch, output):
         """Get the interested information."""

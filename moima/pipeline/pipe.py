@@ -20,6 +20,7 @@ from moima.pipeline.config import DefaultConfig
 from moima.utils._util import get_logger, EarlyStopping
 from moima.utils.loss_fn import build_loss_fn
 from moima.utils.splitter import build_splitter
+from tqdm import tqdm
 
 
 class PipeABC(ABC):
@@ -202,8 +203,8 @@ class PipeABC(ABC):
         """Flatten the batch data."""
         self.model.eval()
         results = defaultdict(list)
-        for batch in loader:
-            output, _ = self._forward_batch(batch)
+        for batch in tqdm(loader, desc='Model running on batch'):
+            output, _ = self._forward_batch(batch, calc_loss=False)
             results['output'].append(output.detach().cpu())
             for item in register_items:
                 value = getattr(batch, item)
@@ -257,8 +258,8 @@ class PipeABC(ABC):
                 clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()             
                 
-                self.set_interested_info(batch, output)
                 if current_iter % self.config.log_interval == 0 or current_iter == total_iter:
+                    self.set_interested_info(batch, output)
                     default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'
                     loss_dict.update(self.interested_info)
                     print_items = []
@@ -274,7 +275,8 @@ class PipeABC(ABC):
                     self.training_trace[current_iter] = loss_dict
                 
                 # Early stopping
-                early_stopping(self.interested_info[self.config.early_stop_metric])
+                if do_early_stop: 
+                    early_stopping(self.interested_info[self.config.early_stop_metric])
                 if do_early_stop and early_stopping.early_stop:
                     self.logger.info(f"Early stopping at epoch {epoch}, at step {current_iter}.")
                     is_early_stop = True

@@ -1,5 +1,6 @@
 from moima.pipeline.downstream.pipe import DownstreamPipe, create_downstream_config_class
 
+
 if __name__ == '__main__':
     DownstreamConfig = create_downstream_config_class('DownstreamConfig',
                                 dataset_name='graph',
@@ -17,8 +18,9 @@ if __name__ == '__main__':
                             desc='dimenet',
                             atom_feature_names=['atomic_num'], 
                             save_interval=5000,
+                            patience=-1,
                             log_interval=1000,
-                            num_epochs=1000,
+                            num_epochs=800,
                             batch_size=32)
     config.update_from_args()
     pipe = DownstreamPipe(config)

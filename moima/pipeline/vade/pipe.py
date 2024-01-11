@@ -17,7 +17,6 @@ VaDEPipeConfig = create_config_class('VaDEPipeConfig',
                                         'vade',
                                         'random',
                                         'vade_loss')
-print(VaDEPipeConfig.__module__, __name__)
 
 
 class VaDEPipe(PipeABC):
