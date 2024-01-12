@@ -1,10 +1,11 @@
-# MolGEN
-Molecule GENeration methods implementation.
-
-## Models To Implement
-### VAEs
-- [ ] [ChemicalVAE](https://pubs.acs.org/doi/full/10.1021/acscentsci.7b00572)
-
-
-## ToDO
-- [ ] Create a class to register model, data, train, inference configs
+# Installation
+## Requirements
+- Python 3.11
+- pytorch
+- torch_geometric
+- torch_scatter
+- torch_sparse
+- torch_cluster
+- pytest
+- pytest-order
+- pandas

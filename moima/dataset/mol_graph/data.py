@@ -7,7 +7,7 @@ from torch_geometric.data import Data
 
 class GraphData(Data, DataABC):
     def __init__(self, 
-                 x: Tensor | None = None, 
+                 x: Optional[Tensor] = None, 
                  edge_index: OptTensor = None, 
                  edge_attr: OptTensor = None, 
                  y: OptTensor = None, 

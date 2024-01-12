@@ -16,7 +16,8 @@ VaDEPipeConfig = create_config_class('VaDEPipeConfig',
                                         'smiles_seq',
                                         'vade',
                                         'random',
-                                        'vade_loss')
+                                        'vade_loss',
+                                        'none')
 
 
 class VaDEPipe(PipeABC):
@@ -55,8 +56,8 @@ class VaDEPipe(PipeABC):
         self.interested_info.update(info)
         return x_hat, loss_dict
     
-    def set_interested_info(self, batch, output: Tensor):
-        return super().set_interested_info(batch, output)
+    def set_interested_info(self):
+        return super().set_interested_info()
         
     def pretrain(self, pre_epoch: int=50, retrain: bool=False) -> str:
         dataloader = self.loader['train']

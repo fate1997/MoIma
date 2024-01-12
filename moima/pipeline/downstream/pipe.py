@@ -19,7 +19,8 @@ def create_downstream_config_class(class_name: str,
                         dataset_name: str,
                         model_name: str,
                         splitter_name: str,
-                        loss_fn_name: str):
+                        loss_fn_name: str,
+                        scheduler_name: str):
     r"""Create the downstream config class."""
     pretrained_pipe_class = ('pretrained_pipe_class', 
                              str, 
@@ -36,6 +37,7 @@ def create_downstream_config_class(class_name: str,
                                     model_name,
                                     splitter_name,
                                     loss_fn_name,
+                                    scheduler_name,
                                     [pretrained_pipe_class, pretrained_pipe_path])
     setattr(inspect.getmodule(DownstreamPipe), class_name, Config)
     Config.__module__ = inspect.getmodule(DownstreamPipe).__name__
@@ -65,7 +67,7 @@ class DownstreamPipe(PipeABC):
             return output, {'loss': loss}
         return output, {}
     
-    def set_interested_info(self, batch, output):
+    def set_interested_info(self):
         """Get the interested information."""
         results = self.batch_flatten(self.loader['val'], ['y'], return_numpy=True)
         metrics = RegressionMetrics(results['y'], results['output'])

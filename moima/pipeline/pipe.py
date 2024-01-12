@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Tuple
 import pathlib
 import inspect
+import pprint
 
 import numpy as np
 import torch
@@ -81,7 +82,7 @@ class PipeABC(ABC):
         # Set attributes
         self.device =  self.config.device
         self.n_epoch =  self.config.num_epochs
-        self.in_step_mode = False
+        self.in_step_mode = self.config.in_step_mode
         
         if featurizer is not None:
             self.featurizer = featurizer
@@ -108,8 +109,12 @@ class PipeABC(ABC):
         self.optimizer = self.build_optimizer(optimizer_state_dict)
         # Build the scheduler
         scheduler_args = self.config.scheduler
-        scheduler_args.update({'optimizer': self.optimizer})
-        self.scheduler = build_scheduler(**scheduler_args)
+        if scheduler_args['name'] == 'none':
+            self.scheduler = None
+        else:
+            print(scheduler_args)
+            scheduler_args.update({'optimizer': self.optimizer})
+            self.scheduler = build_scheduler(**scheduler_args)
         # Save the config
         self.config.to_yaml(os.path.join(self.workspace, 'config.yaml'))
       
@@ -207,7 +212,9 @@ class PipeABC(ABC):
         """Flatten the batch data."""
         self.model.eval()
         results = defaultdict(list)
-        for batch in tqdm(loader, desc='Model running on batch'):
+        if self.config.show_tqdm:
+            loader = tqdm(loader, desc='Model running on batch')
+        for batch in loader:
             output, _ = self._forward_batch(batch, calc_loss=False)
             results['output'].append(output.detach().cpu())
             for item in register_items:
@@ -228,7 +235,7 @@ class PipeABC(ABC):
     
     def train(self, n_epoch: int=None):
         """Train the model."""
-        self.logger.info(f"{repr(self.config)}")
+        self.logger.info(f"{pprint.pformat(self.config.group_dict)}")
         self.logger.info("Training".center(60, "-"))
         self.model.train()
         if n_epoch is None:
@@ -262,13 +269,14 @@ class PipeABC(ABC):
                 # Step the scheduler
                 if self.in_step_mode and self.scheduler is not None:
                     self.scheduler.step()
+                    self.interested_info.update({'lr': self.scheduler.get_last_lr()[0]})
                 # Backward
                 self.optimizer.zero_grad()
                 loss.backward()
                 clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()
                 # Save the model normally other than saving in early stopping
-                if not do_early_stop and \
+                if not do_early_stop and self.in_step_mode and\
                     current_iter % self.config.save_interval == 0:
                     self.save()
                 # Log the information in mini-batch if in step mode
@@ -284,9 +292,18 @@ class PipeABC(ABC):
                     self.logger.info(f"Early stopping at epoch {epoch}, at step {current_iter}.")
                     is_early_stop = True
                     break
+            # Step the scheduler
+            if not self.in_step_mode and self.scheduler is not None:
+                self.scheduler.step()
+                self.interested_info.update({'lr': self.scheduler.get_last_lr()[0]})
             # Log the information in epoch if not in step mode
-            if not self.in_step_mode:
-                
+            if not self.in_step_mode and epoch % self.config.log_interval == 0 or epoch == n_epoch - 1:
+                self.set_interested_info()
+                self._log(epoch, current_iter, total_iter, loss_dict)
+            # Save the model normally other than saving in early stopping
+            if not do_early_stop and not self.in_step_mode and\
+                epoch % self.config.save_interval == 0:
+                self.save()
             
             # Early stopping in epoch if not in step mode
             if not self.in_step_mode and do_early_stop:

@@ -4,15 +4,15 @@ import inspect
 import json
 from dataclasses import Field, dataclass, field, make_dataclass
 from enum import Enum
-from typing import Any, Dict, List, Tuple, NewType
+from typing import Any, Dict, List, Tuple
 
 import yaml
 
 from moima.dataset import DATASET_REGISTRY, FEATURIZER_REGISTRY
 from moima.model import MODEL_REGISTRY
 from moima.utils.loss_fn import LOSS_FN_REGISTRY
-from moima.utils.splitter import SPLITTER_REGISTRY
 from moima.utils.schedulers import SCHEDULER_REGISTRY
+from moima.utils.splitter import SPLITTER_REGISTRY
 
 
 class ArgType(Enum):
@@ -148,9 +148,12 @@ class DefaultConfig:
     in_step_mode: bool = field(default=False,
                         metadata={'help': 'Whether to log/save/early_stop in step mode.',
                         'type': ArgType.GENERAL})
+    show_tqdm: bool = field(default=False,
+                        metadata={'help': 'Whether to show tqdm.',
+                        'type': ArgType.GENERAL})
     
     # Scheduler
-    scheduler_name: str = field(default=None,
+    scheduler_name: str = field(default='none',
                                 metadata={'help': 'Name of the scheduler.',
                                         'choices': SCHEDULER_REGISTRY.keys(),
                                         'type': ArgType.SCHEDULER})
@@ -164,7 +167,7 @@ class DefaultConfig:
             field_default = v.default
             if input_value != field_default:
                 v.default = input_value
-    
+        
     def get_hash_key(self, exclude: List[str]=None):
         r"""Get the hash key of the config."""
         dhash = hashlib.md5()
@@ -354,19 +357,22 @@ def create_config_class(class_name: str,
                         loss_fn_name: str,
                         scheduler_name: str,
                         addi_args: List[Tuple[str, type, Field]] = []):
-    print(scheduler_name)
     dataset_arg_spec = inspect.getfullargspec(DATASET_REGISTRY[dataset_name])
     model_arg_spec = inspect.getfullargspec(MODEL_REGISTRY[model_name])
     splitter_arg_spec = inspect.getfullargspec(SPLITTER_REGISTRY[splitter_name])
     loss_fn_arg_spec = inspect.getfullargspec(LOSS_FN_REGISTRY[loss_fn_name])
     featurizer_arg_spec = inspect.getfullargspec(FEATURIZER_REGISTRY[dataset_name])
-    scheduler_arg_spec = inspect.getfullargspec(SCHEDULER_REGISTRY[scheduler_name])
+    if scheduler_name != 'none':
+        scheduler_arg_spec = inspect.getfullargspec(SCHEDULER_REGISTRY[scheduler_name])
+        scheduler_arg_fields = get_arg_fields(scheduler_arg_spec, ArgType.SCHEDULER, ['optimizer'])
+    else:
+        scheduler_arg_fields = []
     arg_fields = get_arg_fields(dataset_arg_spec, ArgType.DATASET, ['featurizer']) + \
                  get_arg_fields(model_arg_spec, ArgType.MODEL) + \
                  get_arg_fields(splitter_arg_spec, ArgType.SPLITTER) + \
                  get_arg_fields(loss_fn_arg_spec, ArgType.LOSS_FN) + \
                  get_arg_fields(featurizer_arg_spec, ArgType.FEATURIZER, ['vocab']) + \
-                 get_arg_fields(scheduler_arg_spec, ArgType.SCHEDULER, ['optimizer'])
+                 scheduler_arg_fields
     loss_fn_field = ('loss_fn_name', str, field(default=loss_fn_name,
                                                metadata={'type': ArgType.LOSS_FN,
                                                          'choices': LOSS_FN_REGISTRY.keys()}))

@@ -49,8 +49,8 @@ class VAEPipe(PipeABC):
         self.interested_info.update(info)
         return x_hat, loss
     
-    def set_interested_info(self, batch: DataABC, output: Tensor):
-        return super().set_interested_info(batch, output)
+    def set_interested_info(self):
+        return super().set_interested_info()
     
     def sample(self, num_samples: int=10):
         self.model.eval()
