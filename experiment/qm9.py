@@ -1,5 +1,9 @@
 from moima.pipeline.downstream_pipe import DownstreamPipe, create_downstream_config_class
+import pathlib
+import os
 
+pkg_path = pathlib.Path(__file__).parent.parent
+print(pkg_path)
 
 if __name__ == '__main__':
     DownstreamConfig = create_downstream_config_class('DownstreamConfig',
@@ -9,10 +13,10 @@ if __name__ == '__main__':
                                 loss_fn_name='mse',
                                 scheduler_name='exp')
 
-    config = DownstreamConfig(raw_path='example/raw/qm9.sdf',
-                            label_path='example/raw/qm9_labels.csv',
+    config = DownstreamConfig(raw_path=os.path.join(pkg_path, 'example/raw/qm9.sdf'),
+                            label_path=os.path.join(pkg_path, 'example/raw/qm9_labels.csv'),
                             label_col=['homo'],
-                            processed_path='example/qm9_homo.pt',
+                            processed_path=os.path.join(pkg_path, 'example/qm9_homo.pt'),
                             save_processed=True,
                             force_reload=False,
                             assign_pos=True,
