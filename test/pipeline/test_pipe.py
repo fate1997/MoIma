@@ -4,9 +4,9 @@ import pytest
 import numpy as np
 from torch.utils.data import DataLoader
 
-from moima.pipeline.downstream.pipe import DownstreamPipe, create_downstream_config_class
-from moima.pipeline.vade import VaDEPipe, VaDEPipeConfig
-from moima.pipeline.vae import VAEPipe, VAEPipeConfig
+from moima.pipeline.downstream_pipe import DownstreamPipe, create_downstream_config_class
+from moima.pipeline.vade_pipe import VaDEPipe, VaDEPipeConfig
+from moima.pipeline.vae_pipe import VAEPipe, VAEPipeConfig
 
 
 @pytest.fixture(scope='session')
@@ -118,6 +118,7 @@ def test_downstream(zinc1k):
                                         dataset_name="desc_vec",
                                         model_name='mlp',
                                         splitter_name='random',
+                                        scheduler_name='none',
                                         loss_fn_name='mse')
     
     config = DownstreamPipeConfig(

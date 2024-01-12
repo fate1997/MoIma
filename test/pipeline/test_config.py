@@ -1,10 +1,10 @@
-from moima.pipeline.config import DefaultConfig
+from moima.pipeline.config import Config
 import pytest
 import os
 
 
 def test_default():
-    config = DefaultConfig()
+    config = Config()
     assert hasattr(config, 'dataset')
     assert hasattr(config, 'model')
     assert hasattr(config, 'splitter')
@@ -15,7 +15,7 @@ def test_default():
     assert hasattr(config, 'general')
 
 def test_io(helpers):
-    config = DefaultConfig()
+    config = Config()
     yaml_path = os.path.join(pytest.TEMP_PATH, 'test_config.yaml')
     json_path = os.path.join(pytest.TEMP_PATH, 'test_config.json')
     helpers.remove_files(yaml_path, json_path)
@@ -23,11 +23,11 @@ def test_io(helpers):
     config.to_yaml(yaml_path)
     config.to_json(json_path)
 
-    yaml_config = DefaultConfig.from_file(yaml_path)
+    yaml_config = Config.from_file(yaml_path)
     for key, value in config.__dict__.items():
         assert yaml_config.__dict__[key] == value
     
-    json_config = DefaultConfig.from_file(json_path)
+    json_config = Config.from_file(json_path)
     for key, value in config.__dict__.items():
         assert json_config.__dict__[key] == value
         

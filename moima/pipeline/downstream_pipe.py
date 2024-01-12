@@ -10,7 +10,7 @@ from moima.pipeline import AVAILABLE_PIPELINES
 # from moima.pipeline.downstream.config import DownstreamPipeConfig
 from moima.pipeline.pipe import PipeABC, FeaturizerABC
 import inspect
-from moima.pipeline.config import create_config_class, ArgType, DefaultConfig
+from moima.pipeline.config import create_config_class, ArgType, Config
 from dataclasses import field
 from moima.utils.evaluator.regression import RegressionMetrics
 
@@ -46,15 +46,17 @@ def create_downstream_config_class(class_name: str,
 
 class DownstreamPipe(PipeABC):
     def __init__(self, 
-                 config: DefaultConfig, 
+                 config: Config, 
                  featurizer: FeaturizerABC = None,
                  model_state_dict: Dict[str, Any] = None,
                  optimizer_state_dict: Dict[str, Any] = None,
+                 scheduler_state_dict: Dict[str, Any] = None,
                  is_training: bool = True):
         super().__init__(config, 
                          featurizer,
                          model_state_dict, 
                          optimizer_state_dict, 
+                         scheduler_state_dict,
                          is_training)
 
     def _forward_batch(self, batch, calc_loss=True):

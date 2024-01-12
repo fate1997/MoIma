@@ -13,11 +13,12 @@ import torch
 from torch import Tensor, nn
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import LambdaLR, SequentialLR
 
 from moima.dataset import build_dataset, build_featurizer
 from moima.dataset._abc import DataABC, DatasetABC, FeaturizerABC
 from moima.model import ModelFactory
-from moima.pipeline.config import DefaultConfig
+from moima.pipeline.config import Config
 from moima.utils._util import get_logger, EarlyStopping
 from moima.utils.loss_fn import build_loss_fn
 from moima.utils.splitter import build_splitter
@@ -70,7 +71,7 @@ class PipeABC(ABC):
         training_trace: The training trace of the pipeline.
     """
     def __init__(self,
-                 config: DefaultConfig,
+                 config: Config,
                  featurizer: FeaturizerABC = None,
                  model_state_dict: Dict[str, Any] = None,
                  optimizer_state_dict: Dict[str, Any] = None,
@@ -108,13 +109,10 @@ class PipeABC(ABC):
         # Build the optimizer
         self.optimizer = self.build_optimizer(optimizer_state_dict)
         # Build the scheduler
-        scheduler_args = self.config.scheduler
-        if scheduler_args['name'] == 'none':
+        if self.config.scheduler['name'] == 'none':
             self.scheduler = None
         else:
-            print(scheduler_args)
-            scheduler_args.update({'optimizer': self.optimizer})
-            self.scheduler = build_scheduler(**scheduler_args)
+            self.scheduler = self.build_scheduler(scheduler_state_dict)
         # Save the config
         self.config.to_yaml(os.path.join(self.workspace, 'config.yaml'))
       
@@ -205,6 +203,22 @@ class PipeABC(ABC):
             optimizer.load_state_dict(state_dict)
         return optimizer
     
+    def build_scheduler(self, state_dict: Dict[str, Any] = None) \
+                                                -> torch.optim.lr_scheduler.LRScheduler:
+        """Load the scheduler."""
+        scheduler_args = self.config.scheduler
+        scheduler_args.update({'optimizer': self.optimizer})
+        scheduler = build_scheduler(**scheduler_args)
+        if self.config.warmup_interval > 0:
+            warmup_scheduler = LambdaLR(self.optimizer, 
+                                        lr_lambda=lambda i: i / self.config.warmup_interval)
+            scheduler = SequentialLR(optimizer=self.optimizer,
+                                     schedulers=[warmup_scheduler, scheduler],
+                                     milestones=[self.config.warmup_interval])
+        if state_dict is not None:
+            scheduler.load_state_dict(state_dict)
+        return scheduler        
+    
     def batch_flatten(self, 
                       loader: DataLoader, 
                       register_items: List[str]=[],
@@ -235,7 +249,7 @@ class PipeABC(ABC):
     
     def train(self, n_epoch: int=None):
         """Train the model."""
-        self.logger.info(f"{pprint.pformat(self.config.group_dict)}")
+        self.logger.info('\n'+f"{pprint.pformat(self.config.group_dict)}")
         self.logger.info("Training".center(60, "-"))
         self.model.train()
         if n_epoch is None:
@@ -266,15 +280,14 @@ class PipeABC(ABC):
                     print(current_iter, loss)
                     raise ValueError
                 """
-                # Step the scheduler
-                if self.in_step_mode and self.scheduler is not None:
-                    self.scheduler.step()
-                    self.interested_info.update({'lr': self.scheduler.get_last_lr()[0]})
                 # Backward
                 self.optimizer.zero_grad()
                 loss.backward()
                 clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()
+                # Step the scheduler
+                if self.in_step_mode and self.scheduler is not None and (current_iter % self.config.scheduler_interval == 0 or current_iter < self.config.warmup_interval):
+                    self.scheduler.step()
                 # Save the model normally other than saving in early stopping
                 if not do_early_stop and self.in_step_mode and\
                     current_iter % self.config.save_interval == 0:
@@ -293,9 +306,8 @@ class PipeABC(ABC):
                     is_early_stop = True
                     break
             # Step the scheduler
-            if not self.in_step_mode and self.scheduler is not None:
+            if not self.in_step_mode and self.scheduler is not None and ((epoch+1) % self.config.scheduler_interval == 0 or epoch+1 < self.config.warmup_interval):
                 self.scheduler.step()
-                self.interested_info.update({'lr': self.scheduler.get_last_lr()[0]})
             # Log the information in epoch if not in step mode
             if not self.in_step_mode and epoch % self.config.log_interval == 0 or epoch == n_epoch - 1:
                 self.set_interested_info()
@@ -325,6 +337,8 @@ class PipeABC(ABC):
         self.logger.info(f"Training finished in {time_elapsed:.2f} minutes")
     
     def _log(self, epoch: int, current_iter: int, total_iter: int, loss_dict: Dict[str, Any]):
+        if self.scheduler is not None:
+            self.interested_info.update({'lr': self.scheduler.get_last_lr()[0]})
         default_info = f'[Epoch {epoch}|{current_iter}/{total_iter}]'
         loss_dict.update(self.interested_info)
         print_items = []
@@ -345,6 +359,7 @@ class PipeABC(ABC):
             'config': self.config,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler is not None else None,
             'featurizer': self.featurizer,
         }
         # basic_info.update(kwargs)

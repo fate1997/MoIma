@@ -9,7 +9,6 @@ SCHEDULER_REGISTRY = {
     'cos': lr_scheduler.CosineAnnealingLR,
     'reduce': lr_scheduler.ReduceLROnPlateau,
     'cyclic': lr_scheduler.CyclicLR,
-    'one_cicle': lr_scheduler.OneCycleLR,
     'cos_warm': lr_scheduler.CosineAnnealingWarmRestarts,
     'multiply': lr_scheduler.MultiplicativeLR,
     'constant': lr_scheduler.ConstantLR,
@@ -17,6 +16,7 @@ SCHEDULER_REGISTRY = {
     'poly': lr_scheduler.PolynomialLR,
     'none': None
 }
+
 
 def build_scheduler(name: str=None, **kwargs) -> lr_scheduler.LRScheduler:
     """Build a scheduler instance by name.

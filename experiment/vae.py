@@ -1,4 +1,4 @@
-from moima.pipeline.vae.pipe import VAEPipe, VAEPipeConfig
+from moima.pipeline.vae.vae import VAEPipe, VAEPipeConfig
 
 
 config = VAEPipeConfig(

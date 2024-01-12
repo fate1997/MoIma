@@ -30,11 +30,13 @@ class VAEPipe(PipeABC):
                  featurizer: FeaturizerABC = None,
                  model_state_dict: Dict[str, Any] = None,
                  optimizer_state_dict: Dict[str, Any] = None,
+                 scheduler_state_dict: Dict[str, Any] = None,
                  is_training: bool = True):
         super().__init__(config, 
                          featurizer,
                          model_state_dict, 
                          optimizer_state_dict, 
+                         scheduler_state_dict,
                          is_training)
     
     def _forward_batch(self, batch):
