@@ -103,11 +103,13 @@ class DatasetABC(Dataset):
             processed_path = os.path.splitext(raw_path)[0] + '.pt'
         
         if os.path.exists(processed_path) and not force_reload:
-            self.data_list = torch.load(processed_path)
+            load_result = torch.load(processed_path)
+            self.data_list = load_result['data_list']
+            self.featurizer = load_result['featurizer']
         else:
             self.data_list = self.prepare()
             if save_processed:
-                torch.save(self.data_list, processed_path)
+                self.save(processed_path)
     
     def __repr__(self) -> str:
         r"""Return the representation of the dataset."""
@@ -147,7 +149,8 @@ class DatasetABC(Dataset):
     def save(self, path: str=None):
         if path is None:
             path = self.processed_path
-        torch.save(self.data_list, path)    
+        torch.save({'data_list': self.data_list,
+                    'featurizer': self.featurizer}, path)    
     
     def len(self) -> int:
         r"""Return the length of the dataset."""
