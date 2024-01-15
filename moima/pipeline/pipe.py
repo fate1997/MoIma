@@ -297,31 +297,31 @@ class PipeABC(ABC):
                     continue
                 if current_iter % self.config.log_interval == 0 or current_iter == total_iter:
                     self.set_interested_info()
-                    self._log(epoch, current_iter, total_iter, loss_dict)
+                    self._log(self.current_epoch, current_iter, total_iter, loss_dict)
                 # Early stopping in mini-batch if in step mode
                 if do_early_stop: 
                     early_stopping(self.interested_info[self.config.early_stop_metric])
                 if do_early_stop and early_stopping.early_stop:
-                    self.logger.info(f"Early stopping at epoch {epoch}, at step {current_iter}.")
+                    self.logger.info(f"Early stopping at epoch {self.current_epoch}, at step {current_iter}.")
                     is_early_stop = True
                     break
             # Step the scheduler
-            if not self.in_step_mode and self.scheduler is not None and ((epoch+1) % self.config.scheduler_interval == 0 or epoch+1 < self.config.warmup_interval):
+            if not self.in_step_mode and self.scheduler is not None and ((self.current_epoch+1) % self.config.scheduler_interval == 0 or self.current_epoch+1 < self.config.warmup_interval):
                 self.scheduler.step()
             # Log the information in epoch if not in step mode
-            if not self.in_step_mode and epoch % self.config.log_interval == 0 or epoch == n_epoch - 1:
+            if not self.in_step_mode and self.current_epoch % self.config.log_interval == 0 or self.current_epoch == n_epoch - 1 + initial_epoch:
                 self.set_interested_info()
-                self._log(epoch, current_iter, total_iter, loss_dict)
+                self._log(self.current_epoch, current_iter, total_iter, loss_dict)
             # Save the model normally other than saving in early stopping
             if not do_early_stop and not self.in_step_mode and\
-                epoch % self.config.save_interval == 0:
+                self.current_epoch % self.config.save_interval == 0:
                 self.save()
             
             # Early stopping in epoch if not in step mode
             if not self.in_step_mode and do_early_stop:
                 early_stopping(self.interested_info[self.config.early_stop_metric])
                 if early_stopping.early_stop:
-                    self.logger.info(f"Early stopping at epoch {epoch}.")
+                    self.logger.info(f"Early stopping at epoch {self.current_epoch}.")
                     is_early_stop = True
                     break
             if is_early_stop:
