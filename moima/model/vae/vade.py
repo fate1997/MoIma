@@ -61,7 +61,7 @@ class VaDE(nn.Module):
                                emb_dim)
         
         # Additional parameters to define the Gaussian mixture model
-        self.pi_ = nn.Parameter(torch.FloatTensor(n_clusters, ).fill_(1)/n_clusters, requires_grad=True)
+        self.pi_unnorm = nn.Parameter(torch.FloatTensor(n_clusters, ).fill_(1)/n_clusters, requires_grad=True)
         self.mu_c = nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
         self.logvar_c = nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
         self.gmm = GaussianMixture(n_components=n_clusters,
@@ -72,6 +72,13 @@ class VaDE(nn.Module):
         
         self.apply(init_weight)
     
+    @staticmethod
+    def inverse_softmax(x: Tensor, c: float=0) -> Tensor:
+        return torch.log(x) + c
+    
+    @property
+    def pi_(self):
+        return F.softmax(self.pi_unnorm, dim=0)
     
     def predict(self, batch: SeqBatch) -> np.ndarray:
         r"""Predict the cluster label of the input.
@@ -132,7 +139,7 @@ class VaDE(nn.Module):
         x_hat = self.decoder(z, batch)
         # Calculate the probability of each cluster given z
         det = 1e-10
-        pi = self.pi_
+        pi = F.softmax(self.pi_, dim=0)
         log_sigma2_c = self.logvar_c
         mu_c = self.mu_c
         z = self.reparameterize(mu, logvar)

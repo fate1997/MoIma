@@ -272,7 +272,7 @@ class PipeABC(ABC):
                         raise ValueError
                 """
                 current_iter += 1
-                print(current_iter, self.model.pi_.min().item())
+                # print(current_iter, self.model.pi_.min().item())
                 output, loss_dict = self._forward_batch(batch)
                 loss = loss_dict['loss']
                 """
