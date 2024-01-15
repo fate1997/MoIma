@@ -7,7 +7,10 @@ pkg_path = pathlib.Path(__file__).parent.parent
 
 if __name__ == '__main__':
     config = VaDEPipeConfig(raw_path=os.path.join(pkg_path, 'example/ilthermo_ionic_liquids.csv'),
-                            desc='IL_latent_dim256',  # `test` has passed
+                            processed_path=os.path.join(pkg_path, 'example/il.pt'),
+                            desc='IL_latent_dim256', 
+                            save_processed=True,
+                            force_reload=False,# `test` has passed
                             save_interval=10,
                             in_step_mode=False,
                             log_interval=5,
