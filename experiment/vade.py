@@ -21,8 +21,7 @@ if __name__ == '__main__':
                             seq_len=256,
                             lr=1e-3,
                             device='cuda:0',
-                            vocab_size=55,
-                            vocab_path=os.path.join(pkg_path, 'example/ilthermo_ILs_vocab.pkl'))
+                            vocab_size=55)
     pipe = VaDEPipe(config)
     pipe.pretrain(pre_epoch=20, retrain=False)
     pipe.train()
