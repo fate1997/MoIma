@@ -75,6 +75,14 @@ class DownstreamPipe(PipeABC):
         metrics = RegressionMetrics(results['y'], results['output'])
         self.interested_info.update({'val_MAE': metrics.mae})
     
+    def eval(self, loader_name: str='test'):
+        """Evaluate the model."""
+        self.logger.info('Evaluating'.center(60, "-"))
+        loader = self.loader[loader_name]
+        eval_outputs = self.batch_flatten(loader, register_items=['y'], return_numpy=True)
+        metrics = RegressionMetrics(eval_outputs['y'], eval_outputs['output'])
+        return metrics.get_metrics()
+    
     @property
     def custom_saveitems(self) -> Dict[str, Any]:
         """The items that will be saved besides `DEFAULT_SAVEITEMS."""

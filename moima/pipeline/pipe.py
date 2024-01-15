@@ -117,7 +117,7 @@ class PipeABC(ABC):
         self.config.to_yaml(os.path.join(self.workspace, 'config.yaml'))
       
     @classmethod
-    def from_pretrained(cls, path: str, is_training: bool = False):
+    def from_pretrained(cls, path: str, is_training: bool = True):
         """Load the pretrained model."""
         results = torch.load(path)
         results.update({'is_training': is_training})
@@ -222,15 +222,17 @@ class PipeABC(ABC):
     def batch_flatten(self, 
                       loader: DataLoader, 
                       register_items: List[str]=[],
-                      return_numpy: bool=False) -> Dict[str, Any]:
+                      return_numpy: bool=False,
+                      register_output: bool=True) -> Dict[str, Any]:
         """Flatten the batch data."""
         self.model.eval()
         results = defaultdict(list)
         if self.config.show_tqdm:
             loader = tqdm(loader, desc='Model running on batch')
         for batch in loader:
-            output, _ = self._forward_batch(batch, calc_loss=False)
-            results['output'].append(output.detach().cpu())
+            if register_output:
+                output, _ = self._forward_batch(batch, calc_loss=False)
+                results['output'].append(output.detach().cpu())
             for item in register_items:
                 value = getattr(batch, item)
                 if isinstance(value, Tensor):

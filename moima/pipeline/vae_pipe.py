@@ -6,6 +6,7 @@ from tqdm import tqdm
 from moima.pipeline.pipe import PipeABC
 from moima.pipeline.config import create_config_class
 from moima.dataset._abc import DataABC, FeaturizerABC
+from moima.utils.evaluator.generation import GenerationMetrics
 
 from typing import Any, Dict
 
@@ -15,7 +16,7 @@ VAEPipeConfig = create_config_class('VAEPipeConfig',
                                     'chemical_vae',
                                     'random',
                                     'vae_loss',
-                                    'linear')
+                                    'none')
 
 class VAEPipe(PipeABC):
     r"""Variational autoencoder pipeline.
@@ -39,11 +40,14 @@ class VAEPipe(PipeABC):
                          scheduler_state_dict,
                          is_training)
     
-    def _forward_batch(self, batch):
+    def _forward_batch(self, batch, calc_loss=True):
         r"""Forward a batch of data."""
         batch.to(self.device)
+        self.model.to(self.device)
         x_hat, mu, logvar = self.model(batch)
-        loss = self.loss_fn(batch, mu, logvar, x_hat, self.current_epoch) 
+        loss = {}
+        if calc_loss:
+            loss = self.loss_fn(batch, mu, logvar, x_hat, self.current_epoch) 
         
         info = {}
         info['Label'] = self.featurizer.decode(batch.x[0], is_raw=True)
@@ -54,17 +58,35 @@ class VAEPipe(PipeABC):
     def set_interested_info(self):
         return super().set_interested_info()
     
+    def eval(self, loader_name: str='test'):
+        self.logger.info('Evaluating'.center(60, "-"))
+        loader = self.loader['train']
+        train_smiles = self.batch_flatten(loader, 
+                                          register_items=['smiles'],
+                                          register_output=False)['smiles']
+        loader = self.loader[loader_name]
+        eval_outputs = self.batch_flatten(loader, register_items=['smiles'])
+        eval_smiles = eval_outputs['smiles']
+        eval_recon_smiles = [self.featurizer.decode(x, is_raw=False) \
+                             for x in eval_outputs['output']]
+        sampled_smiles = self.sample(10000)
+        metrics = GenerationMetrics(sampled_smiles,
+                                    train_smiles,
+                                    eval_smiles,
+                                    eval_recon_smiles)
+        return metrics.get_metrics()
+        
     def sample(self, num_samples: int=10):
         self.model.eval()
         with torch.no_grad():
             model = self.model.to('cpu')
             featurizer = self.featurizer
-            sos_idx = featurizer.charset_dict[featurizer.SOS]
-            eos_idx = featurizer.charset_dict[featurizer.EOS]
-            pad_idx = featurizer.charset_dict[featurizer.PAD]      
+            sos_idx = featurizer.vocab_dict[featurizer.SOS]
+            eos_idx = featurizer.vocab_dict[featurizer.EOS]
+            pad_idx = featurizer.vocab_dict[featurizer.PAD]      
             max_len = featurizer.seq_len
             
-            z = torch.randn(num_samples, model.h2mu.out_features)
+            z = torch.randn(num_samples, model.encoder.h2mu.out_features)
             if num_samples == 1:
                 z_0 = z.view(1, 1, -1) 
             else:

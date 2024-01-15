@@ -10,6 +10,7 @@ from moima.dataset._abc import FeaturizerABC
 from moima.pipeline.pipe import PipeABC
 from moima.pipeline.config import create_config_class
 from moima.dataset.smiles_seq.data import SeqBatch
+from moima.utils.evaluator.generation import GenerationMetrics
 
 
 VaDEPipeConfig = create_config_class('VaDEPipeConfig',
@@ -35,7 +36,7 @@ class VaDEPipe(PipeABC):
                          scheduler_state_dict,
                          is_training)
     
-    def _forward_batch(self, batch: SeqBatch) -> Tuple[Tensor, 
+    def _forward_batch(self, batch: SeqBatch, calc_loss=True) -> Tuple[Tensor, 
                                                        Dict[str, Tensor]]:
         r"""Forward a batch of data.
         
@@ -48,15 +49,35 @@ class VaDEPipe(PipeABC):
         batch.to(self.device)
         self.model.to(self.device)
         x_hat, mu, logvar, log_eta_c = self.model(batch, is_pretrain=False)
-        loss_dict = self.loss_fn(batch, mu, logvar, x_hat, log_eta_c, 
-                                self.model.pi_, 
-                                self.model.mu_c,
-                                self.model.logvar_c)
+        loss_dict = {}
+        if calc_loss:
+            loss_dict = self.loss_fn(batch, mu, logvar, x_hat, log_eta_c, 
+                                    self.model.pi_, 
+                                    self.model.mu_c,
+                                    self.model.logvar_c)
         info = {}
         info['Label'] = self.featurizer.decode(batch.x[0], is_raw=True)
         info['Reconstruction'] = self.featurizer.decode(x_hat[0], is_raw=False)
         self.interested_info.update(info)
         return x_hat, loss_dict
+    
+    def eval(self, loader_name: str='test'):
+        self.logger.info('Evaluating'.center(60, "-"))
+        loader = self.loader['train']
+        train_smiles = self.batch_flatten(loader, 
+                                          register_items=['smiles'],
+                                          register_output=False)['smiles']
+        loader = self.loader[loader_name]
+        eval_outputs = self.batch_flatten(loader, register_items=['smiles'])
+        eval_smiles = eval_outputs['smiles']
+        eval_recon_smiles = [self.featurizer.decode(x, is_raw=False) \
+                             for x in eval_outputs['output']]
+        sampled_smiles = self.sample(10000)
+        metrics = GenerationMetrics(sampled_smiles,
+                                    train_smiles,
+                                    eval_smiles,
+                                    eval_recon_smiles)
+        return metrics.get_metrics()
     
     def set_interested_info(self):
         return super().set_interested_info()
