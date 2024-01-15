@@ -1,20 +1,25 @@
-from moima.pipeline.vade import VaDEPipeConfig, VaDEPipe
+from moima.pipeline.vade_pipe import VaDEPipeConfig, VaDEPipe
+import pathlib
+import os
+
+pkg_path = pathlib.Path(__file__).parent.parent
 
 
 if __name__ == '__main__':
-    config = VaDEPipeConfig(raw_path='example/database/ilthermo_ILs.csv', 
+    config = VaDEPipeConfig(raw_path=os.path.join(pkg_path, 'example/ilthermo_ionic_liquids.csv'),
                             desc='IL_latent_dim256',  # `test` has passed
-                            save_interval=5000,
-                            log_interval=1000,
+                            save_interval=10,
+                            in_step_mode=False,
+                            log_interval=5,
                             num_epochs=300,
-                            batch_size=800,
+                            batch_size=256,
                             latent_dim=256,
-                            n_clusters=10,
+                            n_clusters=50,
                             seq_len=256,
                             lr=2e-3,
                             device='cuda:0',
                             vocab_size=55,
-                            vocab_path='example/database/ilthermo_ILs_vocab.pkl')
+                            vocab_path=os.path.join(pkg_path, 'example/ilthermo_ILs_vocab.pkl'))
     pipe = VaDEPipe(config)
-    pipe.pretrain(pre_epoch=20, retrain=True)
+    pipe.pretrain(pre_epoch=20, retrain=False)
     pipe.train()
