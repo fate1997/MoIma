@@ -92,6 +92,8 @@ class VaDELossCalc:
         # Add KL divergence loss
         eta_c = torch.exp(log_eta_c)
         if torch.isnan(eta_c).any():
+            print(eta_c)
+            print(log_eta_c)
             raise ValueError('eta_c contains NaN')
         loss = 0.5*torch.mean(torch.sum(eta_c*torch.sum(logvar_c.unsqueeze(0)+
                                         torch.exp(logvar.unsqueeze(1)-logvar_c.unsqueeze(0))+

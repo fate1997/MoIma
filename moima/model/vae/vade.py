@@ -140,13 +140,13 @@ class VaDE(nn.Module):
         normal_pdf = MultivariateNormal(mu_c, scale).log_prob(z.unsqueeze(1))
         eta_c = torch.log(pi.unsqueeze(0)) + normal_pdf
         log_eta_c = eta_c - torch.logsumexp(eta_c, dim=1, keepdim=True)
-        """ 
-        if torch.isnan(normalized_eta_c).any():
-            print(f'eta_c: {eta_c}')
-            print(f'log_eta_c: {eta_c - torch.logsumexp(eta_c, dim=1, keepdim=True)}')
-            torch.save({'z': z, 'pi': pi, 'mu_c': mu_c, 'log_sigma2_c': log_sigma2_c}, 'vade_params.pt')
+
+        if torch.isnan(log_eta_c).any():
+            print(f'eta_c has nan values: {torch.isnan(eta_c).any()}')
+            print(f'min_pi: {pi.min().item()}')
+            print(f'log_eta_c: {log_eta_c}')
             raise ValueError('eta_c contains NaN')
-         """
+
         return x_hat, mu, logvar, log_eta_c
     
     def ELBO_Loss(self, batch: SeqBatch) -> Dict[str, Tensor]:
