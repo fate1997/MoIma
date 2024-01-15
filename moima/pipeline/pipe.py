@@ -336,6 +336,18 @@ class PipeABC(ABC):
         else:
             self.save()
         
+        metrics = self.eval('test')
+        print_items = []
+        for k, v in metrics.items():
+            if isinstance(v, Tensor):
+                v = v.item()
+            if type(v) is float:
+                print_items.append(f'[{k}: {round(v, 4)}]')
+            else:
+                print_items.append(f'[{k}: {v}]')
+        info = ''.join(print_items)
+        self.logger.info(info)
+        
         time_elapsed = (time.time() - starting_time) / 60
         self.logger.info(f"Training finished in {time_elapsed:.2f} minutes")
     
