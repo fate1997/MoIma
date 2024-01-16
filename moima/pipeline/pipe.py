@@ -242,8 +242,11 @@ class PipeABC(ABC):
             if not isinstance(v[0], Tensor):
                 v = np.array(v, dtype=object)
                 concat_values = np.concatenate(v, axis=0).tolist()
-            else:    
-                concat_values = torch.cat(v, dim=0)
+            else:
+                try:
+                    concat_values = torch.cat(v, dim=0)
+                except RuntimeError:
+                    concat_values = v
             if return_numpy and isinstance(concat_values, Tensor):
                 concat_values = concat_values.detach().cpu().numpy()
             results[k] = concat_values

@@ -67,8 +67,14 @@ class VAEPipe(PipeABC):
         loader = self.loader[loader_name]
         eval_outputs = self.batch_flatten(loader, register_items=['smiles'])
         eval_smiles = eval_outputs['smiles']
-        eval_recon_smiles = [self.featurizer.decode(x, is_raw=False) \
-                             for x in eval_outputs['output']]
+        eval_recon_smiles = []
+        if isinstance(eval_outputs['output'], Tensor):
+            eval_recon_smiles = [self.featurizer.decode(x, is_raw=False) \
+                                 for x in eval_outputs['output']]
+        else:
+            for batch_x in eval_outputs['output']:
+                for x in batch_x:
+                    eval_recon_smiles.append(self.featurizer.decode(x, is_raw=False))
         sampled_smiles = self.sample(10000)
         metrics = GenerationMetrics(sampled_smiles,
                                     train_smiles,
