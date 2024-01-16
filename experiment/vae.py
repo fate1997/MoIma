@@ -17,7 +17,6 @@ if __name__ == '__main__':
                             num_epochs=100,
                             batch_size=256,
                             latent_dim=256,
-                            n_clusters=50,
                             seq_len=256,
                             lr=1e-3,
                             device='cuda:0',
