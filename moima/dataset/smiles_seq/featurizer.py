@@ -71,6 +71,7 @@ class SeqFeaturizer(FeaturizerABC):
         try:
             seq = list(map(lambda x: self.vocab_dict[x], revised_smiles))
         except KeyError:
+            return None
             raise KeyError(f"SMILES string {smiles_copy} contains unknown characters.")
         seq = torch.tensor(seq, dtype=torch.long)
         seq_len = torch.tensor(len(smiles) + 2, dtype=torch.long)

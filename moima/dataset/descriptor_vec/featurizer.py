@@ -128,6 +128,8 @@ class DescFeaturizer(FeaturizerABC):
             desc.append(_get_desc_from_dict(mol, desc_dict))
         if 'addi_dict' in self.desc_names:
             desc.append(_get_desc_from_dict(mol, self.additional_desc_dict))
+            if _get_desc_from_dict(mol, self.additional_desc_dict) is None:
+                return None
         desc = np.concatenate(desc)
         
         desc = torch.from_numpy(desc).float()
