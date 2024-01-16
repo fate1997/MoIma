@@ -139,7 +139,7 @@ class VaDE(nn.Module):
         x_hat = self.decoder(z, batch)
         # Calculate the probability of each cluster given z
         det = 1e-10
-        pi = F.softmax(self.pi_, dim=0)
+        pi = self.pi_
         log_sigma2_c = self.logvar_c
         mu_c = self.mu_c
         z = self.reparameterize(mu, logvar)
