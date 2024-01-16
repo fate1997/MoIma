@@ -93,10 +93,13 @@ class DownstreamPipe(PipeABC):
         # Load the pretrained pipe
         pretrained_pipe_class = AVAILABLE_PIPELINES[self.config.pretrained_pipe_class]
         pretrained_pipe_path = self.config.pretrained_pipe_path
-        pretrained_pipe = pretrained_pipe_class.from_pretrained(pretrained_pipe_path)
+        pretrained_pipe = pretrained_pipe_class.from_pretrained(pretrained_pipe_path, is_training=False)
         
         # Build the dataset and loader for the pretrained pipe
         pretrained_pipe.config.raw_path = self.config.raw_path
+        pretrained_pipe.config.force_reload = True
+        pretrained_pipe.config.save_processed = False
+        pretrained_pipe.config.vocab_path = 'example\ilthermo_ILs_vocab.pkl'
         dataset = pretrained_pipe.build_dataset()
         loader = dataset.create_loader(batch_size=512)
         
@@ -105,9 +108,9 @@ class DownstreamPipe(PipeABC):
         smiles_list = []
         for batch in tqdm(loader, desc='Featurizing by pretrained pipe'):
             batch.to(pretrained_pipe.device)
-            reprs.append(pretrained_pipe.model.get_repr(batch))
+            reprs.append(pretrained_pipe.model.get_repr(batch).detach().cpu())
             smiles_list.extend(batch.smiles)
-        reprs = torch.cat(reprs, dim=0).detach().cpu().numpy()
+        reprs = torch.cat(reprs, dim=0).numpy()
         desc_dict = {smiles: reprs[i] for i, smiles in enumerate(smiles_list)}
         return desc_dict
     
