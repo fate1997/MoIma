@@ -15,6 +15,26 @@ class VaDELossCalc:
     """
     def __init__(self, kl_weight: float=1.0):
         self.kl_weight = kl_weight
+        self.kl_scheduler = self.loss_annealing()
+    
+    def loss_annealing(self, 
+                       start_weight: float = 0.0001,
+                        end_weight: float = 0.0025,
+                        num_epochs: int = 100,
+                        n_cycles: int = 5,
+                        ratio: float = 0.7):#
+        # Get the KL weight schedule
+        scheduler = end_weight * np.ones(num_epochs)
+        period = num_epochs / n_cycles
+        step = (end_weight - start_weight)/(period * ratio)
+
+        for c in range(n_cycles):
+            v , i = start_weight, 0
+            while v <= end_weight and (int(i+c * period) < num_epochs):
+                scheduler[int(i+c * period)] = v
+                v += step
+                i += 1
+        return scheduler
             
     def __call__(self, 
                  batch: SeqBatch, 
@@ -24,7 +44,8 @@ class VaDELossCalc:
                  log_eta_c: Tensor,
                  pi: Tensor, 
                  mu_c: Tensor,
-                 logvar_c: Tensor,) -> Dict[str, Tensor]:
+                 logvar_c: Tensor,
+                 current_epoch) -> Dict[str, Tensor]:
         r"""Calculate the loss of the VaDE model.
         
         Args:
@@ -43,7 +64,7 @@ class VaDELossCalc:
         """
         recon_loss = self.recon_loss(batch, x_hat)
         kl_loss = self.kl_loss(mu, logvar, log_eta_c, pi, mu_c, logvar_c)
-        kl_loss = self.kl_weight * kl_loss
+        kl_loss = self.kl_scheduler[current_epoch] * kl_loss# self.kl_weight * kl_loss
         loss_dict = {'recon_loss': recon_loss, 
                      'kl_loss': kl_loss, 
                      'loss': recon_loss+kl_loss}
