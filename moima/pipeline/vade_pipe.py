@@ -54,7 +54,8 @@ class VaDEPipe(PipeABC):
             loss_dict = self.loss_fn(batch, mu, logvar, x_hat, log_eta_c, 
                                     self.model.pi_, 
                                     self.model.mu_c,
-                                    self.model.logvar_c)
+                                    self.model.logvar_c,
+                                    self.current_epoch)
         info = {}
         info['Label'] = self.featurizer.decode(batch.x[0], is_raw=True)
         info['Reconstruction'] = self.featurizer.decode(x_hat[0], is_raw=False)
