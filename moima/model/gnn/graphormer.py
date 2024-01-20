@@ -11,19 +11,19 @@ from .._util import get_activation
 class Graphormer(nn.Module):
     def __init__(
         self,
-        num_classes=1,
-        edge_dim=3,
-        num_atoms=4608,
-        max_degree=512,
-        num_spatial=511,
-        multi_hop_max_dist=5,
-        num_encoder_layers=12,
-        embedding_dim=768,
-        ffn_embedding_dim=768,
-        num_attention_heads=32,
-        dropout=0.1,
-        pre_layernorm=True,
-        activation_fn='gelu',
+        num_classes: int=1,
+        edge_dim: int=3,
+        num_atoms: int=4608,
+        max_degree: int=512,
+        num_spatial: int=511,
+        multi_hop_max_dist: int=5,
+        num_encoder_layers: int=12,
+        embedding_dim: int=768,
+        ffn_embedding_dim: int=768,
+        num_attention_heads: int=32,
+        dropout: float=0.1,
+        pre_layernorm: bool=True,
+        act:str='gelu',
     ):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -53,7 +53,7 @@ class Graphormer(nn.Module):
         self.emb_layer_norm = nn.LayerNorm(self.embedding_dim)
 
         self.layers = nn.ModuleList([])
-        activation_fn = get_activation(activation_fn)
+        activation_fn = get_activation(act)
         self.layers.extend(
             [
                 GraphormerLayer(
