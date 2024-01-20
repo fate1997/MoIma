@@ -47,12 +47,10 @@ class GraphFeaturizer(FeaturizerABC):
         smiles = Chem.MolToSmiles(mol)
         
         # Atom features
-        atom_features = []
+        atom_features = self.atom_featurizer(mol)
         z = []
         for atom in mol.GetAtoms():
-            atom_features.append(self.atom_featurizer(atom))
             z.append(atom.GetAtomicNum())
-        atom_features = torch.from_numpy(np.stack(atom_features, axis=0)).float()
         z = torch.tensor(z, dtype=torch.long)
         
         # Edge index

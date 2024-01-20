@@ -105,6 +105,7 @@ class PipeABC(ABC):
         # Update the model config according to the featurizer
         for arg, value in self.featurizer.arg4model.items():
             setattr(self.config, arg, value)
+        print(self.config)
         self.model = self.build_model(model_state_dict)
         # Build the optimizer
         self.optimizer = self.build_optimizer(optimizer_state_dict)
@@ -289,10 +290,10 @@ class PipeABC(ABC):
                 # Backward
                 self.optimizer.zero_grad()
                 loss.backward()
-                clip_grad_norm_(self.model.parameters(), 50)
+                # clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()
                 # Step the scheduler
-                if self.in_step_mode and self.scheduler is not None and (current_iter % self.config.scheduler_interval == 0 or current_iter < self.config.warmup_interval):
+                if self.in_step_mode and self.scheduler is not None and (current_iter % self.config.scheduler_interval == 0 or current_iter <= self.config.warmup_interval):
                     self.scheduler.step()
                 # Save the model normally other than saving in early stopping
                 if not do_early_stop and self.in_step_mode and\

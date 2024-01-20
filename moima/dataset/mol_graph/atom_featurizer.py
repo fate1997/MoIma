@@ -1,9 +1,14 @@
 # Generate atom features
 
-from typing import Callable, List, Dict
-import numpy as np
+from typing import Any, Callable, Dict, List
 
+import numpy as np
+import torch
 from rdkit import Chem
+from rdkit.Chem import AllChem
+from scipy.optimize import fsolve
+from scipy.spatial import distance_matrix
+from collections import defaultdict
 
 Atom = Chem.rdchem.Atom
 AtomFeaturesGenerator = Callable[[Atom], np.ndarray]
@@ -15,8 +20,11 @@ class AtomFeaturizer:
     def __init__(self, 
                  generator_name_list: List[str], 
                  params: Dict[str, dict]={}):
+        if 'all' in generator_name_list:
+            generator_name_list = get_avail_atom_features()
         self.generator_name_list = generator_name_list
-        self.params = params  
+        self.params = defaultdict(dict)
+        self.params.update(params)
     
     @property
     def available_features(self):
@@ -25,18 +33,28 @@ class AtomFeaturizer:
     @property
     def dim(self):
         mol = Chem.MolFromSmiles('C')
-        atom = mol.GetAtomWithIdx(0)
-        num_features = 0
-        for name in self.generator_name_list:
-            if name in self.params:
-                num_features += len(get_atom_feature_generator(name)(atom, **self.params[name]))
-            else:
-                num_features += len(get_atom_feature_generator(name)(atom))
+        AllChem.Compute2DCoords(mol)
+        num_features = self(mol).shape[1]
         return num_features
     
-    def __call__(self, atom: Atom) -> np.ndarray:
+    def __call__(self, mol: Chem.Mol):
+        # Atom features
+        atom_features = []
+        for atom in mol.GetAtoms():
+            atom_features.append(self.get_atom_repr(atom))
+        
+        for name in self.generator_name_list:
+            if 'MOLINPUT' in name:
+                add_features = get_atom_feature_generator(name)(mol, **self.params[name])
+                atom_features = np.concatenate([atom_features, add_features], axis=1)
+        atom_features = torch.from_numpy(np.stack(atom_features, axis=0)).float()
+        return atom_features
+    
+    def get_atom_repr(self, atom: Atom) -> np.ndarray:
         atom_features = []
         for name in self.generator_name_list:
+            if 'MOLINPUT' in name:
+                continue
             if name not in self.available_features:
                 raise ValueError(f'Features generator "{name}" could not be found.')
             if name in self.params:
@@ -177,3 +195,30 @@ def formal_charge_features_generator(atom: Atom) -> List:
 def mass_features_generator(atom: Atom) -> List:
     r"""Generates the atom mass."""
     return [atom.GetMass() * 0.01]
+
+
+@register_atom_features_generator('geo_env_MOLINPUT')
+def geometry_env_generator(mol: Chem.Mol, 
+                           feature_dim: int=32,
+                           min_dist: float=1.0,
+                           cutoff: float=5.0, 
+                           n: int=1):
+    r"""Generates the geometry environment of the atom."""
+    assert mol.GetNumConformers() > 0, 'No conformer found.'
+    pos = mol.GetConformer().GetPositions()
+    
+    def rbf_expansion(x, y, cutoff=5.0, n=1):
+        return np.sqrt(2.0 / cutoff) * np.sin(np.pi * x * n / cutoff) / x - y
+
+    max_y = rbf_expansion(min_dist, 0.0, cutoff, n)
+    min_y = rbf_expansion(cutoff, 0.0, cutoff, n)
+    y_grid = np.linspace(min_y, max_y, feature_dim + 1)
+    dist_ranges = fsolve(rbf_expansion, x0=np.ones(feature_dim + 1), args=(y_grid,))
+    dist_ranges = np.flip(dist_ranges).reshape(-1, 1, 1)
+    dist_ranges.squeeze()
+    
+    dist = distance_matrix(pos, pos)
+    dist_repeat = np.concatenate([[dist]] * feature_dim, axis=0)
+    result = np.logical_and(dist_repeat >= dist_ranges[:-1], 
+                            dist_repeat < dist_ranges[1:]).sum(axis=1).T
+    return result
