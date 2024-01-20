@@ -12,9 +12,13 @@ BOND_FEATURES_GENERATOR_REGISTRY = {}
 class BondFeaturizer:
     def __init__(self, 
                  generator_name_list: List[str], 
-                 params: Dict[str, dict]={}):
+                 params: Dict[str, dict]={},
+                 return_onehot: bool=True):
         self.generator_name_list = generator_name_list
+        if 'all' in self.generator_name_list:
+            self.generator_name_list = get_avail_bond_features()
         self.params = params  
+        self.return_onehot = return_onehot
     
     @property
     def available_features(self):
@@ -26,9 +30,17 @@ class BondFeaturizer:
             if name not in self.available_features:
                 raise ValueError(f'Features generator "{name}" could not be found.')
             if name in self.params:
-                bond_features += get_bond_features_generator(name)(bond, **self.params[name])
+                feature = get_bond_features_generator(name)(bond, **self.params[name])
             else:
-                bond_features += get_bond_features_generator(name)(bond)
+                feature = get_bond_features_generator(name)(bond)
+            
+            if self.return_onehot:
+                bond_features += feature
+            else:
+                if len(feature) == 1:
+                    bond_features.append(feature[0])
+                else:
+                    bond_features.append(feature.index(1))
         return np.array(bond_features)
     
     def __repr__(self):

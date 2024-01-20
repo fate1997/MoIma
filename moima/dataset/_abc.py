@@ -87,17 +87,19 @@ class DatasetABC(Dataset):
     """
     
     def __init__(self,
-                 raw_path: str,
-                 featurizer: FeaturizerABC,
+                 raw_path: str=None,
+                 featurizer: FeaturizerABC=None,
                  processed_path: str=None,
                  force_reload: bool=False,
-                 save_processed: bool=False):
+                 save_processed: bool=False,
+                 toy_length: int=-1):
         super().__init__()
         self.raw_path = raw_path
         self.featurizer = featurizer
         self.force_reload = force_reload
         self.save_processed = save_processed
         self.processed_path = processed_path
+        self.toy_length = toy_length
         
         if processed_path is None:
             processed_path = os.path.splitext(raw_path)[0] + '.pt'

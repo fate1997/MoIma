@@ -78,7 +78,7 @@ class VaDE(nn.Module):
     
     @property
     def pi_(self):
-        return F.softmax(self.pi_unnorm, dim=0)
+        return F.relu(self.pi_unnorm) #, dim=0
     
     def predict(self, batch: SeqBatch) -> np.ndarray:
         r"""Predict the cluster label of the input.

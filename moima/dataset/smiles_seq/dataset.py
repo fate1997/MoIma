@@ -31,11 +31,12 @@ class SeqDataset(DatasetABC):
                  vocab_path: str = None,
                  processed_path: str = None,
                  force_reload: bool = False,
-                 save_processed: bool = False):
+                 save_processed: bool = False,
+                 toy_length: int = -1):
         self.vocab_path = vocab_path
         self.additional_cols = additional_cols
         super().__init__(raw_path, featurizer, processed_path, 
-                         force_reload, save_processed)
+                         force_reload, save_processed, toy_length)
     
     @staticmethod
     def collate_fn(batch: List[SeqData]) -> SeqBatch:
@@ -74,7 +75,7 @@ class SeqDataset(DatasetABC):
         # Extract additional columns
         additional_kwargs = dict(zip(self.additional_cols,
                                      df[self.additional_cols].values.T))
-
+        smiles_list = smiles_list if self.toy_length == -1 else smiles_list[:self.toy_length]
         data_list = self.featurizer(smiles_list, **additional_kwargs)
 
         return data_list

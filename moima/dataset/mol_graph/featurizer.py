@@ -22,12 +22,15 @@ class GraphFeaturizer(FeaturizerABC):
                  atom_feature_names: List[str],
                  bond_feature_names: List[str]=[],
                  atom_feature_params: Dict[str, dict]={},
+                 return_onehot: bool=True,
                  assign_pos: bool = False):
         self.atom_feature_names = atom_feature_names
         self.bond_feature_names = bond_feature_names
         self.atom_featurizer = AtomFeaturizer(atom_feature_names, 
-                                              atom_feature_params)
-        self.bond_featurizer = BondFeaturizer(bond_feature_names)
+                                              atom_feature_params,
+                                              return_onehot)
+        self.bond_featurizer = BondFeaturizer(bond_feature_names,
+                                              return_onehot=return_onehot)
         self.assign_pos = assign_pos
     
     def __repr__(self) -> str:
@@ -47,12 +50,10 @@ class GraphFeaturizer(FeaturizerABC):
         smiles = Chem.MolToSmiles(mol)
         
         # Atom features
-        atom_features = []
+        atom_features = self.atom_featurizer(mol)
         z = []
         for atom in mol.GetAtoms():
-            atom_features.append(self.atom_featurizer(atom))
             z.append(atom.GetAtomicNum())
-        atom_features = torch.from_numpy(np.stack(atom_features, axis=0)).float()
         z = torch.tensor(z, dtype=torch.long)
         
         # Edge index

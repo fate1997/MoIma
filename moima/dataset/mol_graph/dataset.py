@@ -13,7 +13,7 @@ from rdkit import Chem
 
 class GraphDataset(DatasetABC):
     def __init__(self, 
-                 raw_path: str,
+                 raw_path: str = None,
                  label_path: str = None,
                  remove_hydrogen: bool = False,
                  label_col: Union[str, List[str]] = None,
@@ -21,13 +21,14 @@ class GraphDataset(DatasetABC):
                  featurizer: GraphFeaturizer = None,
                  processed_path: str = None,
                  force_reload: bool = False,
-                 save_processed: bool = False):
+                 save_processed: bool = False,
+                 toy_length: int = -1):
         self.label_col = [label_col] if isinstance(label_col, str) else label_col
         self.label_path = label_path
         self.remove_hydrogen = remove_hydrogen
         self.additional_cols = additional_cols
         super().__init__(raw_path, featurizer, processed_path, 
-                         force_reload, save_processed)
+                         force_reload, save_processed, toy_length)
     
     def prepare(self) -> List[GraphData]:
         r"""Prepare data for the dataset."""
@@ -55,5 +56,6 @@ class GraphDataset(DatasetABC):
         additional_kwargs = dict(zip(self.additional_cols,
                                     df[self.additional_cols].values.T))
         additional_kwargs.update({'y': torch.FloatTensor(labels)})
+        mols = mols if self.toy_length == -1 else [mols[i] for i in range(self.toy_length)]
         data_list = self.featurizer(mols, **additional_kwargs)   
         return data_list

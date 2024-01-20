@@ -8,6 +8,7 @@ from .vae.chemical_vae import ChemicalVAE
 from .vae.vade import VaDE
 from .gnn.gat_v2 import GATv2
 from .gnn.dimenet import DimeNet
+from .gnn.graphormer import Graphormer
 
 MODEL_REGISTRY = {
     "chemical_vae": ChemicalVAE,
@@ -15,6 +16,7 @@ MODEL_REGISTRY = {
     "mlp": MLP,
     "gat_v2": GATv2,
     "dimenet": DimeNet,
+    'graphormer': Graphormer
 }
 
 

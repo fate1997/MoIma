@@ -198,7 +198,8 @@ class PipeABC(ABC):
     def build_optimizer(self, state_dict: Dict[str, Any] = None) \
                                                 -> torch.optim.Optimizer:
         """Load the optimizer."""
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.lr)
+        optimizer = torch.optim.AdamW(self.model.parameters(), 
+                                      lr=self.config.lr)
         if state_dict is not None:
             optimizer.load_state_dict(state_dict)
         return optimizer
@@ -292,7 +293,8 @@ class PipeABC(ABC):
                 clip_grad_norm_(self.model.parameters(), 50)
                 self.optimizer.step()
                 # Step the scheduler
-                if self.in_step_mode and self.scheduler is not None and (current_iter % self.config.scheduler_interval == 0 or current_iter < self.config.warmup_interval):
+                if self.in_step_mode and self.scheduler is not None and (current_iter % self.config.scheduler_interval == 0 or current_iter <= self.config.warmup_interval):
+                    print(f'epoch: {self.current_epoch}, iter: {current_iter}, lr: {self.scheduler.get_last_lr()[0]}')
                     self.scheduler.step()
                 # Save the model normally other than saving in early stopping
                 if not do_early_stop and self.in_step_mode and\

@@ -9,6 +9,7 @@ ACTIVATION_REGISTER = {
     'leaky_relu': nn.LeakyReLU(),
     'none': nn.Identity(),
     'prelu': nn.PReLU(),
+    'gelu': nn.GELU(),
 }
 
 

@@ -16,11 +16,12 @@ class DescDataset(DatasetABC):
                  additional_cols: List[str] = [],
                  processed_path: str = None, 
                  force_reload: bool = False, 
-                 save_processed: bool = False):
+                 save_processed: bool = False,
+                 toy_length: int = -1):
         self.label_col = [label_col] if isinstance(label_col, str) else label_col
         self.additional_cols = additional_cols
         super().__init__(raw_path, featurizer, processed_path, force_reload, 
-                         save_processed)
+                         save_processed, toy_length)
         
     @staticmethod
     def collate_fn(batch: List[VecData]):
@@ -57,7 +58,7 @@ class DescDataset(DatasetABC):
         additional_kwargs = dict(zip(self.additional_cols,
                                      df[self.additional_cols].values.T))
         additional_kwargs.update({'y': torch.FloatTensor(labels)})
-        
+        smiles_list = smiles_list if self.toy_length == -1 else smiles_list[:self.toy_length]
         data_list = self.featurizer(smiles_list, **additional_kwargs)
 
         return data_list

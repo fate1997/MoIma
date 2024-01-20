@@ -129,7 +129,8 @@ class VaDEPipe(PipeABC):
             
             self.model.gmm.fit(Z)
             weight = torch.from_numpy(self.model.gmm.weights_).to(self.device).float()
-            self.model.pi_.data = self.model.inverse_softmax(weight)
+            print(weight.min(), weight.max())
+            self.model.pi_.data = weight# self.model.inverse_softmax(weight)
             self.model.mu_c.data = torch.from_numpy(self.model.gmm.means_).to(self.device).float()
             self.model.logvar_c.data = torch.log(torch.from_numpy(self.model.gmm.covariances_)).to(self.device).float()
 
