@@ -17,19 +17,20 @@ config = DownstreamConfig(raw_path=os.path.join(pkg_path, 'example/docking/IL_MP
                         label_col=['MP_K'],
                         processed_path=os.path.join(pkg_path, 'example/IL_docked.pt'),
                         save_processed=True,
-                        force_reload=False,
+                        force_reload=True,
                         assign_pos=True,
                         desc='dimenet',
                         atom_feature_names=['atomic_num'], 
                         save_interval=30,
-                        patience=-1,
+                        patience=500,
                         log_interval=10,
                         warmup_interval=5,
                         scheduler_interval=80,
                         lr=1e-3,
                         gamma=0.1,
+                        cutoff=10.0,
                         in_step_mode=False,
-                        num_epochs=300,
+                        num_epochs=500,
                         batch_size=32)
 config.update_from_args()
 pipe = DownstreamPipe(config)

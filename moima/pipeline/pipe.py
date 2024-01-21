@@ -313,7 +313,7 @@ class PipeABC(ABC):
                     is_early_stop = True
                     break
             # Step the scheduler
-            if not self.in_step_mode and self.scheduler is not None and ((self.current_epoch+1) % self.config.scheduler_interval == 0 or self.current_epoch+1 < self.config.warmup_interval):
+            if not self.in_step_mode and self.scheduler is not None and ((self.current_epoch+1) % self.config.scheduler_interval == 0 or self.current_epoch < self.config.warmup_interval):
                 self.scheduler.step()
             # Log the information in epoch if not in step mode
             if not self.in_step_mode and self.current_epoch % self.config.log_interval == 0 or self.current_epoch == n_epoch - 1 + initial_epoch:
