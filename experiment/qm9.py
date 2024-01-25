@@ -11,7 +11,7 @@ if __name__ == '__main__':
                                 model_name='dimenet++',
                                 splitter_name='random',
                                 loss_fn_name='l1',
-                                scheduler_name='exp')
+                                scheduler_name='cos')
 
     config = DownstreamConfig(raw_path=os.path.join(pkg_path, 'example/raw/qm9.sdf'),
                             label_path=os.path.join(pkg_path, 'example/raw/qm9_labels.csv'),
@@ -22,18 +22,19 @@ if __name__ == '__main__':
                             assign_pos=True,
                             desc='dimenetpp',
                             atom_feature_names=['atomic_num'], 
-                            save_interval=5000,
-                            patience=-1,
-                            log_interval=1000,
-                            warmup_interval=3000,
-                            scheduler_interval=2000000,
-                            frac_train=111000,
+                            save_interval=10,
+                            patience=500,
+                            log_interval=5,
+                            warmup_interval=5,
+                            scheduler_interval=1,
+                            frac_train=110000,
                             frac_val=10000,
                             lr=1e-3,
-                            gamma=0.1,
-                            in_step_mode=True,
-                            num_epochs=800,
-                            batch_size=32)
+                            eta_min=1e-5,
+                            in_step_mode=False,
+                            num_epochs=500,
+                            T_max=50,
+                            batch_size=128)
     config.update_from_args()
     pipe = DownstreamPipe(config)
     pipe.train()
