@@ -11,6 +11,7 @@
 - [ ] GraphVAE - https://github.com/JiaxuanYou/graph-generation
 - [ ] JTVAE
 - [ ] GraphAF
+- [ ] Make `pipeline` be a context manager?
 
 
 2023-11-20
