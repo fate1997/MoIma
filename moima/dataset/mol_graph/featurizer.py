@@ -13,6 +13,7 @@ from moima.dataset._abc import FeaturizerABC
 from moima.dataset.mol_graph.data import GraphData
 from moima.dataset.mol_graph.atom_featurizer import AtomFeaturizer
 from moima.dataset.mol_graph.bond_featurizer import BondFeaturizer
+from moima.dataset.mol_graph.transform import get_transform
 from moima.typing import MolRepr
 
 
@@ -22,13 +23,17 @@ class GraphFeaturizer(FeaturizerABC):
                  atom_feature_names: List[str],
                  bond_feature_names: List[str]=[],
                  atom_feature_params: Dict[str, dict]={},
-                 assign_pos: bool = False):
+                 assign_pos: bool = False,
+                 transform_names: List[str]=[],):
         self.atom_feature_names = atom_feature_names
         self.bond_feature_names = bond_feature_names
         self.atom_featurizer = AtomFeaturizer(atom_feature_names, 
                                               atom_feature_params)
         self.bond_featurizer = BondFeaturizer(bond_feature_names)
         self.assign_pos = assign_pos
+        
+        if len(transform_names) > 0:
+            self.transforms = [get_transform(name) for name in transform_names]
     
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.atom_feature_names}, {self.bond_feature_names})'
@@ -37,6 +42,26 @@ class GraphFeaturizer(FeaturizerABC):
         if mol.GetNumConformers() == 0:
             return
         else:
+            pos = mol.GetConformer().GetPositions()
+            from sklearn.decomposition import PCA
+            import random
+            pos = pos - np.mean(pos, axis=0)
+            pca = PCA(n_components=3)
+            pca.fit(pos)
+            comp = pca.components_
+            sign_variants = np.array([[1, 1, 1],
+                            [1, 1, -1],
+                            [1, -1, 1],
+                            [1, -1, -1],
+                            [-1, 1, 1],
+                            [-1, 1, -1],
+                            [-1, -1, 1],
+                            [-1, -1, -1]])
+            index = random.randint(0, sign_variants.shape[0] - 1)
+            sign = sign_variants[index]
+            comp = comp * sign
+            pos = np.dot(pos, comp.T)
+            # return torch.as_tensor(pos).float()
             return torch.as_tensor(mol.GetConformer().GetPositions()).float()
     
     def encode(self, mol: MolRepr) -> GraphData:
@@ -77,6 +102,12 @@ class GraphFeaturizer(FeaturizerABC):
                                smiles=smiles,
                                pos=pos,
                                z=z)
+        
+        # Apply the transform
+        if hasattr(self, 'transforms'):
+            for transform in self.transforms:
+                graph_data = transform(graph_data)
+            
         return graph_data
 
     @property

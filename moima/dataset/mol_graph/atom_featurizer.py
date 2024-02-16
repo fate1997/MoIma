@@ -3,12 +3,14 @@
 from typing import Any, Callable, Dict, List
 
 import numpy as np
+import random
 import torch
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from scipy.optimize import fsolve
 from scipy.spatial import distance_matrix
 from collections import defaultdict
+from sklearn.decomposition import PCA
 
 Atom = Chem.rdchem.Atom
 AtomFeaturesGenerator = Callable[[Atom], np.ndarray]
@@ -33,6 +35,7 @@ class AtomFeaturizer:
     @property
     def dim(self):
         mol = Chem.MolFromSmiles('C')
+        mol = Chem.AddHs(mol)
         AllChem.Compute2DCoords(mol)
         num_features = self(mol).shape[1]
         return num_features
@@ -197,7 +200,45 @@ def mass_features_generator(atom: Atom) -> List:
     return [atom.GetMass() * 0.01]
 
 
-@register_atom_features_generator('geo_env_MOLINPUT')
+# @register_atom_features_generator('tsne_MOLINPUT')
+def tsne_generator(mol: Chem.Mol, 
+                   feature_dim: int=3, 
+                   perplexity: float=1):
+    r"""Generates the t-SNE features of the atom."""
+    assert mol.GetNumConformers() > 0, 'No conformer found.'
+    pos = mol.GetConformer().GetPositions()
+    from sklearn.manifold import TSNE
+    tsne = TSNE(n_components=feature_dim, perplexity=perplexity)
+    pos = tsne.fit_transform(pos)
+    return pos
+
+
+# @register_atom_features_generator('invariant_pca_MOLINPUT')
+def invariant_pca_generator(mol: Chem.Mol):
+    r"""Generates the invariant PCA features of the atom."""
+    assert mol.GetNumConformers() > 0, 'No conformer found.'
+    pos = mol.GetConformer().GetPositions()
+    if pos.shape[0] == 1:
+        return np.zeros((1, 3))
+    pca = PCA(n_components=3)
+    pca.fit(pos)
+    comp = pca.components_
+    sign_variants = np.array([[1, 1, 1],
+                    [1, 1, -1],
+                    [1, -1, 1],
+                    [1, -1, -1],
+                    [-1, 1, 1],
+                    [-1, 1, -1],
+                    [-1, -1, 1],
+                    [-1, -1, -1]])
+    index = random.randint(0, sign_variants.shape[0] - 1)
+    sign = sign_variants[index]
+    comp = comp * sign
+    pos = np.dot(pos, comp.T)
+    return pos
+
+
+# @register_atom_features_generator('geo_env_MOLINPUT')
 def geometry_env_generator(mol: Chem.Mol, 
                            feature_dim: int=32,
                            min_dist: float=1.0,

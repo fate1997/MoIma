@@ -6,6 +6,9 @@ from .._util import init_weight, get_activation, MLP
 
 from typing import List, Tuple
 
+from e3nn.o3 import spherical_harmonics
+from e3nn.nn import FullyConnectedNet
+from mace.modules.blocks import RadialEmbeddingBlock
 
 
 def seed_all():
@@ -52,7 +55,28 @@ class GATv2(nn.Module):
                            dropout=pred_dropout,
                            activation=activation)
 
+        # For debugging
+        self.linear_x = nn.Linear(num_atom_features, 64)
+        self.linear_x.apply(init_weight)
+        self.radial_basis_function = RadialEmbeddingBlock(r_max=5, num_bessel=8, num_polynomial_cutoff=6)
+        self.radial_mlp = MLP(input_dim=8, 
+                              hidden_dim=64, 
+                              output_dim=64, 
+                              n_layers=2, 
+                              dropout=0.1, 
+                              activation='prelu')
+        
+        
     def forward(self, batch: GraphData):
+        # pos = batch.pos
+        # dist = torch.norm(pos, dim=-1, keepdim=True)
+        # dist_emb = self.radial_basis_function(dist)
+        # dist_emb = self.radial_mlp(dist_emb)
+        # x = self.linear_x(batch.x)
+        # spherical_basis = [spherical_harmonics(i, pos, True, 'component') for i in range(8)]
+        # spherical_basis = torch.cat(spherical_basis, dim=-1)
+        # x = x * spherical_basis * dist_emb
+        
         output, _,= self.gat((batch.x, batch.edge_index))
         weighted = self.atom_weighting(output)
         output1 = global_max_pool(output, batch.batch)
@@ -64,7 +88,7 @@ class GATv2(nn.Module):
 class GATLayer(nn.Module):
     def __init__(self, num_node_features: int, output_dim: int, num_heads: int,
                  activation=nn.PReLU(), concat: bool = True, residual: bool = True,
-                 bias: bool = True, dropout: float = 0.1, share_weights: bool = False):
+                 bias: bool = True, dropout: float = 0.1, share_weights: bool = True):
         super(GATLayer, self).__init__()
 
         seed_all()

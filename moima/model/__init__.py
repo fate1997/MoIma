@@ -9,6 +9,7 @@ from .vae.vade import VaDE
 from .gnn.gat_v2 import GATv2
 from .gnn.dimenet import DimeNet
 from .gnn.dimenet_pp import DimeNetPP
+from .gnn.faenet import FAENet
 
 MODEL_REGISTRY = {
     "chemical_vae": ChemicalVAE,
@@ -17,6 +18,7 @@ MODEL_REGISTRY = {
     "gat_v2": GATv2,
     "dimenet": DimeNet,
     "dimenet++": DimeNetPP,
+    "faenet": FAENet,
 }
 
 
