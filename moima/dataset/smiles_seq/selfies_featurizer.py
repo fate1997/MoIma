@@ -1,7 +1,8 @@
 import pickle
 import warnings
 from copy import deepcopy
-from typing import List
+from typing import Set, List
+import selfies as sf
 
 import torch
 from rdkit import Chem
@@ -10,13 +11,11 @@ from tqdm import tqdm
 from moima.dataset._abc import FeaturizerABC
 from moima.dataset.smiles_seq.data import SeqData
 
-DEFAULT_VOCAB = [' ', '$', '!', '#', '(', ')', '+', '-', '/', '1', '2', '3', '4',
- '5', '6', '7', '8', '=', '@', 'C', 'F', 'G', 'H', 'I', 'N', 'O', 'P', 'R', 'S', '[',
- '\\', ']', 'c', 'n', 'o', 's', '.']
+DEFAULT_VOCAB = {'[N]', '[O]'}
 
 
-class SeqFeaturizer(FeaturizerABC):
-    r"""The class for featurizing SMILES strings into sequences.
+class SelfiesFeaturizer(FeaturizerABC):
+    r"""The class for featurizing SELFIES strings into sequences.
     
     Args:
         vocab: A list of characters in the vocabulary.
@@ -27,20 +26,13 @@ class SeqFeaturizer(FeaturizerABC):
         PAD: The padding token.
     """
     
-    # Double tokens
-    DOUBLE_TOKEN_DICT = {
-        'Br': 'R',
-        'Cl': 'G',
-        'Si': 'X',
-    }
-    
     # Special tokens
-    SOS = '$'
-    EOS = '!'
-    PAD = ' '
+    SOS = '[$]'
+    EOS = '[!]'
+    PAD = '[nop]'
         
     def __init__(self, 
-                 vocab: List[str]=DEFAULT_VOCAB,
+                 vocab: Set[str]=DEFAULT_VOCAB,
                  seq_len: int=120):
         assert len(set(vocab)) == len(vocab), "Vocabulary contains duplicate characters."
         self.seq_len = seq_len
@@ -55,27 +47,27 @@ class SeqFeaturizer(FeaturizerABC):
         return f"SeqFeaturizer(seq_len: {self.seq_len}, vocab_size: {self.vocab_size})"
     
     def encode(self, mol: str) -> SeqData:
-        r"""Encode a SMILES string into a sequence."""
-        smiles_copy = deepcopy(mol)
-        # Replace double tokens to single tokens
-        smiles = self._double2single(mol)
-                
-        # Add special tokens (start, end, pad)
-        if len(smiles) > self.seq_len - 2:
-            smiles = smiles[:self.seq_len - 2]
-            warnings.warn(f"SMILES string {smiles} is longer than the maximum.")
-        revised_smiles = f"{self.SOS}{smiles}{self.EOS}"
-        revised_smiles = revised_smiles.ljust(self.seq_len, self.PAD)
-        
-        # Encode SMILES
+        r"""Encode a SELFIES string into a sequence."""
         try:
-            seq = list(map(lambda x: self.vocab_dict[x], revised_smiles))
-        except KeyError:
+            selfies = sf.encoder(mol)
+        except sf.EncoderError:
+            print(f"SELFIES failed to encode SMILES: {mol}")
             return None
-            raise KeyError(f"SMILES string {smiles_copy} contains unknown characters.")
+        selfies_symbols = list(sf.split_selfies(selfies))
+        # Add special tokens (start, end, pad)
+        if len(selfies_symbols) > self.seq_len - 2:
+            selfies_symbols = selfies_symbols[:self.seq_len - 2]
+            warnings.warn(f"SELFIES string {selfies} is longer than the maximum.")
+        revised_selfies = f"{self.SOS}{selfies}{self.EOS}"
+        
+        seq = sf.selfies_to_encoding(revised_selfies,
+                                     self.vocab_dict,
+                                     pad_to_len=self.seq_len,
+                                     enc_type='label')
         seq = torch.tensor(seq, dtype=torch.long)
-        seq_len = torch.tensor(len(smiles) + 2, dtype=torch.long)
-        return SeqData(seq, seq_len, smiles_copy)
+        seq_len = torch.tensor(len(selfies_symbols) + 2, dtype=torch.long)
+        smiles = self.decode(seq, is_raw=True)
+        return SeqData(seq, seq_len, smiles)
 
     def reload_vocab(self, smiles_list: List[str]):
         r"""Reload the vocab by the given list of SMILES strings.
@@ -86,14 +78,15 @@ class SeqFeaturizer(FeaturizerABC):
         Returns:
             A list of uniqe characters in the SMILES strings.
         """
-        s = set()
+        selfies_list = []
         for smiles in tqdm(smiles_list, desc='Update vocabulary'):
-            smiles = Chem.CanonSmiles(smiles)
-            smiles = self._double2single(smiles)
-            for c in smiles:
-                s.add(c)
-        vocab = sorted(list(s))
-        vocab = [self.PAD, self.SOS, self.EOS] + vocab
+            try:
+                selfies = sf.encoder(smiles)
+                selfies = f'{self.SOS}{selfies}{self.EOS}'
+                selfies_list.append(selfies)
+            except:
+                pass
+        vocab = sf.get_alphabet_from_selfies(selfies_list)
         self._set_vocab(vocab)
     
     def load_vocab(self, file_path: str) -> List[str]:
@@ -123,32 +116,23 @@ class SeqFeaturizer(FeaturizerABC):
             vocab_idx = x
         else:
             vocab_idx = torch.argmax(x, dim=1)
-        vocab_idx = vocab_idx.int().tolist()
-        smiles = "".join(map(lambda x: self.vocab[x], vocab_idx)).strip()
+        vocab_idx = vocab_idx.cpu().numpy()
+        selfies = sf.encoding_to_selfies(vocab_idx, self.idx2char, enc_type='label')
         # Tokens clear
-        start = smiles.find(self.SOS)
-        end = smiles.find(self.EOS)
-        smiles = smiles[start + 1:end]
-        smiles = self._single2double(smiles)
+        selfies = selfies.replace(self.SOS, '').replace(self.EOS, '').replace(self.PAD, '')
+        try:
+            smiles = sf.decoder(selfies)
+        except sf.DecoderError:
+            smiles = ''
         return smiles  
     
-    def _set_vocab(self, vocab: List[str]):
+    def _set_vocab(self, vocab: Set[str]):
         r"""Set the vocab dictionary."""
         self.vocab = vocab
+        self.vocab.add(self.PAD)
         self.vocab_dict =  {c: i for i, c in enumerate(self.vocab)}
-    
-    def _double2single(self, smiles: str) -> str:
-        r"""Replace double tokens to single tokens."""
-        for k, v in self.DOUBLE_TOKEN_DICT.items():
-            smiles = smiles.replace(k, v)
-        return smiles
-    
-    def _single2double(self, smiles: str) -> str:
-        r"""Replace single tokens to double tokens."""
-        for k, v in self.DOUBLE_TOKEN_DICT.items():
-            smiles = smiles.replace(v, k)
-        return smiles
-    
+        self.idx2char = {v: k for k, v in self.vocab_dict.items()}
+       
     @property
     def arg4model(self) -> dict:
         return {'vocab_size': self.vocab_size}

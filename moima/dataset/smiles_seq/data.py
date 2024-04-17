@@ -43,4 +43,7 @@ class SeqBatch:
     def to(self, device: torch.device) -> 'SeqBatch':
         self.x = self.x.to(device)
         self.seq_len = self.seq_len.to(device)
+        for k, v in self.__dict__.items():
+            if isinstance(v, torch.Tensor):
+                setattr(self, k, v.to(device))
         return self

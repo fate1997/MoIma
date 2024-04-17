@@ -3,18 +3,21 @@ from typing import List
 from ._abc import DatasetABC, FeaturizerABC
 from .descriptor_vec.dataset import DescDataset, DescFeaturizer
 from .smiles_seq.dataset import SeqDataset, SeqFeaturizer
+from .smiles_seq.selfies_featurizer import SelfiesFeaturizer
 from .mol_graph.dataset import GraphDataset, GraphFeaturizer
 
 DATASET_REGISTRY = {
     "smiles_seq": SeqDataset,
     "desc_vec": DescDataset,
     'graph': GraphDataset,
+    "selfies_seq": SeqDataset
 }
 
 FEATURIZER_REGISTRY = {
     "smiles_seq": SeqFeaturizer,
     "desc_vec": DescFeaturizer,
     'graph': GraphFeaturizer,
+    "selfies_seq": SelfiesFeaturizer,
 }
 
 

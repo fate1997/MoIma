@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 
 VAEPipeConfig = create_config_class('VAEPipeConfig',
-                                    'smiles_seq',
+                                    'selfies_seq',
                                     'chemical_vae',
                                     'random',
                                     'vae_loss',
@@ -82,7 +82,7 @@ class VAEPipe(PipeABC):
                                     eval_recon_smiles)
         return metrics.get_metrics()
         
-    def sample(self, num_samples: int=10):
+    def sample(self, num_samples: int=10, label: int=None):
         self.model.eval()
         with torch.no_grad():
             model = self.model.to('cpu')
@@ -93,12 +93,18 @@ class VAEPipe(PipeABC):
             max_len = featurizer.seq_len
             
             z = torch.randn(num_samples, model.encoder.h2mu.out_features)
+            if model.consider_label:
+                if label is None:
+                    label = torch.randint(0, model.num_classes, (num_samples,))
+                else:
+                    label = torch.tensor(label).repeat(num_samples)
+                z = model.conditional_z(z, label)
             if num_samples == 1:
                 z_0 = z.view(1, 1, -1) 
             else:
                 z_0 = z.unsqueeze(1)
 
-            h_0 = model.decoder.z2h(z).unsqueeze(0)
+            h_0 = model.decoder.z2h(z).repeat(self.model.decoder.num_layers, 1, 1)
             
             w = torch.tensor(sos_idx).repeat(num_samples)
             x = torch.tensor(pad_idx).repeat(num_samples, max_len)
@@ -129,7 +135,7 @@ class VAEPipe(PipeABC):
         
         smiles_list = []
         for new_x in new_x_cpu:
-            smiles = featurizer.decode(new_x + [1], is_raw=True)
+            smiles = featurizer.decode(torch.Tensor(new_x + [eos_idx]), is_raw=True)
             smiles_list.append(smiles)
         return smiles_list
     

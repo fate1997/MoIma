@@ -119,7 +119,7 @@ def frame_averaging_svd(pos, cell=None, fa_method="stochastic", check=False):
     eigenval = eigenval[idx]
 
     # Compute fa_pos
-    fa_pos, fa_cell, fa_rot = compute_frames_v2(eigenvec, pos, cell, fa_method)
+    fa_pos, fa_cell, fa_rot = compute_frames_v2(eigenvec, pos, cell, fa_method, consider_perm=True)
 
     # No need to update distances, they are preserved.
 
@@ -188,7 +188,7 @@ def compute_frames_v2(
     permute_list = list(permutations(range(dim)))
     permute_list = [torch.LongTensor(x) for x in permute_list]
     if not consider_perm:
-        permute_list = [torch.LongTensor([1, 2, 3])]
+        permute_list = [torch.LongTensor([0, 1, 2])]
     all_fa_pos = []
     all_cell = []
     all_rots = []
@@ -210,7 +210,7 @@ def compute_frames_v2(
     if fa_method == "det" or fa_method == "se3-det":
         sum_eigenvec = torch.sum(eigenvec, axis=0)
         plus_minus_list = [torch.where(sum_eigenvec >= 0, 1.0, -1.0)]
-
+    return [pos @ eigenvec], [fa_cell], [eigenvec.unsqueeze(0)]
     for perm in permute_list:
         for pm in plus_minus_list:
             # Append new graph positions to list

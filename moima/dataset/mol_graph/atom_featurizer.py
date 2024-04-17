@@ -213,7 +213,7 @@ def tsne_generator(mol: Chem.Mol,
     return pos
 
 
-# @register_atom_features_generator('invariant_pca_MOLINPUT')
+@register_atom_features_generator('invariant_pca_MOLINPUT')
 def invariant_pca_generator(mol: Chem.Mol):
     r"""Generates the invariant PCA features of the atom."""
     assert mol.GetNumConformers() > 0, 'No conformer found.'

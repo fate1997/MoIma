@@ -26,15 +26,17 @@ class GRUDecoder(nn.Module):
                  emb_dropout=0.2,
                  latent_dim=292,
                  hidden_dim=501,
+                 num_layers=1,
                  vocab_dim=35,
                  emb_dim=128):
         super().__init__()
         
         self.embedding = embedding
         self.emb_dropout = nn.Dropout(emb_dropout)
-        self.gru = nn.GRU(latent_dim+emb_dim, hidden_dim, batch_first=True)
+        self.gru = nn.GRU(latent_dim+emb_dim, hidden_dim, num_layers, batch_first=True)
         self.z2h = nn.Linear(latent_dim, hidden_dim)
         self.output_head = nn.Linear(hidden_dim, vocab_dim)
+        self.num_layers = num_layers
     
     def forward(self, z: Tensor, batch: SeqBatch) -> Tensor:
         r"""Forward pass of :class:`GRUDecoder`.
@@ -57,7 +59,7 @@ class GRUDecoder(nn.Module):
                                             batch_first=True, 
                                             enforce_sorted=False)
         h_0 = self.z2h(z)
-        h_0 = h_0.unsqueeze(0).repeat(1, 1, 1)
+        h_0 = h_0.unsqueeze(0).repeat(self.num_layers, 1, 1)
         output, _ = self.gru(packed_input, h_0)
         packed_output, _ = pad_packed_sequence(output, batch_first=True)
         y = self.output_head(packed_output)

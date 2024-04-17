@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from moima.pipeline.pipe import PipeABC
 from moima.typing import MolRepr
+from moima.utils.evaluator.sascorer import calculateScore
 
 RDLogger.DisableLog('rdApp.*')
 
@@ -19,7 +20,7 @@ class GenerationMetrics:
     
     Args:
     """
-    AVAIL_METRICS = ['valid', 'unique', 'novel', 'recon_accuracy']
+    AVAIL_METRICS = ['valid', 'unique', 'novel', 'recon_accuracy', 'sascore']
     def __init__(self, 
                  sampled_mols: List[MolRepr], 
                  train_mols: List[MolRepr],
@@ -76,6 +77,13 @@ class GenerationMetrics:
     @property
     def valid(self):
         return len(self.valid_mols) / self.num_samples
+    
+    @property
+    def sascore(self):
+        score = 0
+        for mol in self.valid_mols:
+            score += calculateScore(mol)
+        return score / len(self.valid_mols)
     
     @property
     def unique(self):

@@ -5,6 +5,7 @@ from torch import Tensor, nn
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from moima.dataset.smiles_seq.data import SeqBatch
+from moima.model._util import init_weight
 
 
 class GRUEncoder(nn.Module):
@@ -25,18 +26,24 @@ class GRUEncoder(nn.Module):
                  vocab_dim: int=35,
                  emb_dim: int=128,
                  enc_hidden_dim: int=292,
+                 num_layers: int=1,
                  latent_dim: int=292,
-                 dropout :float=0.2):
+                 dropout :float=0.2,
+                 num_classes: int=0):
         super().__init__()
         
         self.embedding = nn.Embedding(vocab_dim, emb_dim, padding_idx=0)
         self.emb_dropout = nn.Dropout(dropout)
-        self.gru = nn.GRU(emb_dim, enc_hidden_dim, batch_first=True, bidirectional=True)
+        self.gru = nn.GRU(emb_dim + num_classes, 
+                          enc_hidden_dim, 
+                          num_layers, 
+                          batch_first=True, 
+                          bidirectional=True)
         self.fc = nn.Linear(enc_hidden_dim * 2, enc_hidden_dim)
         self.h2mu=nn.Linear(enc_hidden_dim, latent_dim)
         self.h2logvar=nn.Linear(enc_hidden_dim, latent_dim)
     
-    def forward(self, batch: SeqBatch) -> Tuple[Tensor, Tensor]:
+    def forward(self, batch: SeqBatch, y: Tensor=None) -> Tuple[Tensor, Tensor]:
         r"""Forward pass of :class:`GRUEncoder`.
         
         Args:
@@ -50,6 +57,9 @@ class GRUEncoder(nn.Module):
         """
         seq, seq_len = batch.x, batch.seq_len
         input_emb = self.emb_dropout(self.embedding(seq))
+        if y is not None:
+            y = y.unsqueeze(1).expand(-1, seq.size(1), -1)
+            input_emb = torch.cat([input_emb, y], dim=-1)
         packed_input = pack_padded_sequence(input_emb, 
                                             seq_len.tolist(), 
                                             batch_first=True, 

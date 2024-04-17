@@ -285,6 +285,7 @@ def create_config_class(class_name: str,
                         splitter_name: str,
                         loss_fn_name: str,
                         scheduler_name: str,
+                        featurizer_name: str=None,
                         addi_args: List[Tuple[str, type, Field]] = []):
     dataset_arg_spec = inspect.getfullargspec(DATASET_REGISTRY[dataset_name])
     model_arg_spec = inspect.getfullargspec(MODEL_REGISTRY[model_name])
@@ -318,7 +319,9 @@ def create_config_class(class_name: str,
     scheduler_field = ('scheduler_name', str, field(default=scheduler_name,
                                                         metadata={'type': ArgType.SCHEDULER,
                                                                     'choices': SCHEDULER_REGISTRY.keys()}))
-    featurizer_field = ('featurizer_name', str, field(default=dataset_name,
+    if featurizer_name is None:
+        featurizer_name = dataset_name
+    featurizer_field = ('featurizer_name', str, field(default=featurizer_name,
                                                         metadata={'type': ArgType.FEATURIZER,
                                                                     'choices': FEATURIZER_REGISTRY.keys()}))
     arg_fields = [loss_fn_field, featurizer_field, dataset_field, model_field, splitter_field, scheduler_field] + arg_fields

@@ -122,6 +122,7 @@ class PipeABC(ABC):
         """Load the pretrained model."""
         results = torch.load(path)
         results.update({'is_training': is_training})
+        results['config'].force_reload = False
         pipe = cls(**results)
         print(f"Pretrained model loaded.")
         return pipe
