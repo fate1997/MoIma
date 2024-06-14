@@ -1,12 +1,17 @@
 2023-11-23
-- [ ] Maybe loss should be calculated in the `forward` function of the model (however, some loss have parameters like beta)
-- [ ] model's `forward` function should input the `data` object, and output a `dict` object, which contains the `loss` and `output` of the model
-- [ ] Multiple loss should be supported
+- [x] Maybe loss should be calculated in the `forward` function of the model (however, some loss have parameters like beta)
+- [x] model's `forward` function should input the `data` object, and output a `dict` object, which contains the `loss` and `output` of the model 
+- [x] Multiple loss should be supported
 - [x] SMILESFeaturizer is much lower than VANILA | @property problem
-- [ ] sample function should be in the model
+- [x] sample function should be in the model (however, in that case, the model should have access to the featurizer)
 - [ ] self.training_trace
 - [ ] vocab size should be inherited from the dataset
 - [ ] using workdir as output dir
+- [x] merge featurizer arguments into dataset?
+- [ ] GraphVAE - https://github.com/JiaxuanYou/graph-generation
+- [ ] JTVAE
+- [ ] GraphAF
+- [ ] Make `pipeline` be a context manager?
 
 
 2023-11-20

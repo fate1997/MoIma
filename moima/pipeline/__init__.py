@@ -1,5 +1,5 @@
-from moima.pipeline.vae.pipe import VAEPipe
-from moima.pipeline.vade.pipe import VaDEPipe
+from moima.pipeline.vae_pipe import VAEPipe
+from moima.pipeline.vade_pipe import VaDEPipe
 from typing import Dict
 from moima.pipeline.pipe import PipeABC
 

@@ -31,13 +31,14 @@ class RandomSplitter(SplitterABC):
                  split_test: bool = True,
                  batch_size: int = 64,
                  seed: int = 42):
-        
+        super().__init__(frac_train, frac_val, split_test, batch_size)
         self.train_val = [frac_train, frac_val]
         self.split_test = split_test
         self.seed = seed
         self.batch_size = batch_size
         
     def _float2int(self, dataset_len: int):
+        r"""Convert the float ratios to integers."""
         number_list = self.train_val
         if isinstance(number_list[0], float):
             number_list[0] = int(number_list[0] * dataset_len)
@@ -46,6 +47,14 @@ class RandomSplitter(SplitterABC):
         self.train_val = number_list
         
     def __call__(self, dataset: DatasetABC) -> Tuple[DataLoader, DataLoader, DataLoader]:
+        r"""Split the dataset into train, val and test data loaders.
+        
+        Args:
+            dataset (DatasetABC): The dataset to be split.
+        
+        Returns:
+            A tuple of train, val and test data loaders.
+        """
         dataset.random_shuffle(self.seed)
         self._float2int(len(dataset))
         
@@ -54,12 +63,12 @@ class RandomSplitter(SplitterABC):
         train_dataset = dataset[:cum_sum[0]]
         val_dataset = dataset[cum_sum[0]:cum_sum[1]]
         
-        train_loader = self.create_loader(train_dataset)
-        val_loader = self.create_loader(val_dataset)
+        train_loader = train_dataset.create_loader(self.batch_size, shuffle=True)
+        val_loader = val_dataset.create_loader(self.batch_size, shuffle=False)
         
         if not self.split_test:
             return train_loader, val_loader, None
         
         test_dataset = dataset[cum_sum[1]:]
-        test_loader = self.create_loader(test_dataset)
+        test_loader = test_dataset.create_loader(self.batch_size, shuffle=False)
         return train_loader, val_loader, test_loader

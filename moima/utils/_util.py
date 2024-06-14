@@ -3,6 +3,7 @@ import logging.config
 import os
 import sys
 
+import numpy as np
 import torch
 
 
@@ -32,3 +33,34 @@ def get_logger(name: str, log_dir: str):
     logger = logging.getLogger(name)
 
     return logger
+
+
+class EarlyStopping:
+    """Early stops the training if validation score doesn't improve after a given patience."""
+
+    def __init__(self, 
+                 patience: int=100, 
+                 save_func: callable=None):
+        self.patience = patience
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = np.Inf
+        self.save_func = save_func
+        self.last_save_path = None
+
+    def __call__(self, val_metric: float):
+
+        score = -val_metric
+
+        if self.best_score is None:
+            self.best_score = score
+            self.last_save_path = self.save_func(verbose=False)
+        elif score < self.best_score:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.last_save_path = self.save_func(verbose=False)
+            self.counter = 0

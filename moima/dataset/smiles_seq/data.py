@@ -34,9 +34,16 @@ class SeqBatch:
         return f"SeqBatch(shape of x: {self.x.shape})"
     
     def __getitem__(self, index: int) -> SeqData:
-        return SeqData(self.x[index], self.smiles[index])
+        seq_data = SeqData(self.x[index], self.seq_len[index], self.smiles[index])
+        for k, v in self.__dict__.items():
+            if k not in ['x', 'seq_len', 'smiles']:
+                setattr(seq_data, k, v[index])
+        return seq_data
     
     def to(self, device: torch.device) -> 'SeqBatch':
         self.x = self.x.to(device)
         self.seq_len = self.seq_len.to(device)
+        for k, v in self.__dict__.items():
+            if isinstance(v, torch.Tensor):
+                setattr(self, k, v.to(device))
         return self

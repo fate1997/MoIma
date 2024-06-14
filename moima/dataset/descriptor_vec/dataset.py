@@ -1,27 +1,25 @@
-from typing import List, Union, Tuple
+from typing import List, Union
 
 import pandas as pd
 import torch
 
-from .._abc import DatasetABC
+from moima.dataset._abc import DatasetABC
+from moima.dataset.descriptor_vec.data import VecBatch, VecData
 from moima.dataset.descriptor_vec.featurizer import DescFeaturizer
-from .data import VecBatch, VecData
-from tqdm import tqdm
 
 
 class DescDataset(DatasetABC):
     def __init__(self, 
                  raw_path: str, 
+                 featurizer: DescFeaturizer,
                  label_col: Union[str, List[str]],
-                 featurizer: DescFeaturizer, 
+                 additional_cols: List[str] = [],
                  processed_path: str = None, 
                  force_reload: bool = False, 
                  save_processed: bool = False):
         self.label_col = [label_col] if isinstance(label_col, str) else label_col
-        super().__init__(raw_path, 
-                         featurizer, 
-                         processed_path, 
-                         force_reload, 
+        self.additional_cols = additional_cols
+        super().__init__(raw_path, featurizer, processed_path, force_reload, 
                          save_processed)
         
     @staticmethod
@@ -33,10 +31,17 @@ class DescDataset(DatasetABC):
             y.append(data.y)
             smiles.append(data.smiles)
         x = torch.stack(x, dim=0)
-        y = torch.stack(y, dim=0)
-        return VecBatch(x, y, smiles)
+        y = torch.cat(y, dim=0)
+        
+        result_batch = VecBatch(x, y, smiles)
+        for key in batch[0].__dict__:
+            if key not in ['x', 'y', 'smiles']:
+                setattr(result_batch, 
+                        key, 
+                        torch.stack([getattr(b, key) for b in batch]))
+        return result_batch
     
-    def _prepare_data(self):
+    def prepare(self):
         """Prepare data for the dataset."""
         assert self.raw_path.endswith('csv')
         df = pd.read_csv(self.raw_path)
@@ -44,17 +49,15 @@ class DescDataset(DatasetABC):
         # Find the column containing SMILES
         smiles_col = self._get_smiles_column(df)
 
-        # Featurize SMILES
+        # Get SMILES, labels and additional columns
         smiles_list = df[smiles_col].tolist()
         labels = df[self.label_col].to_numpy()
-        print(f'labels.shape: {labels.shape}')
         if len(self.label_col) == 1:
             labels = labels.reshape(-1, 1)
-        data_list = []
-        for i, smiles in enumerate(tqdm(smiles_list, 'Descriptors generation')):
-            data = self.featurizer(smiles, labels[i])
-            if data is None:
-                continue
-            data_list.append(data)
+        additional_kwargs = dict(zip(self.additional_cols,
+                                     df[self.additional_cols].values.T))
+        additional_kwargs.update({'y': torch.FloatTensor(labels)})
+        
+        data_list = self.featurizer(smiles_list, **additional_kwargs)
 
-        return data_list, self.featurizer.input_args
+        return data_list

@@ -1,19 +1,21 @@
 import warnings
-from typing import Any, List, Optional, Dict
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+import torch
 from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem, Descriptors
 from rdkit.ML.Descriptors.MoleculeDescriptors import \
     MolecularDescriptorCalculator
 
-from .._abc import DataABC, FeaturizerABC
-from .data import VecData
-import torch
+from moima.dataset._abc import DataABC, FeaturizerABC
+from moima.dataset.descriptor_vec.data import VecData
+from moima.typing import MolRepr
 
 
 def _get_ecfp(mol: Chem.Mol, radius: int, n_bits: int) -> np.ndarray:
+    r"""Get ECFP fingerprint."""
     morgan_fingerprint = AllChem.GetMorganFingerprintAsBitVect(mol, 
                                                             radius, 
                                                             n_bits, 
@@ -23,41 +25,73 @@ def _get_ecfp(mol: Chem.Mol, radius: int, n_bits: int) -> np.ndarray:
     return morgan_fingerprint_array
 
 
-def _get_rdkit_desc(mol: Chem.Mol):
+def _get_rdkit_desc(mol: Chem.Mol) -> np.ndarray:
+    r"""Get RDKit descriptors."""
     calc = MolecularDescriptorCalculator([x[0] for x in Descriptors._descList])
     descriptors = calc.CalcDescriptors(mol)
     return np.array(descriptors)
 
 
-def _get_desc_from_csv(csv_path: str):
+def _get_dict_from_csv(csv_path: str) -> Dict[str, np.ndarray]:
+    r"""Get descriptor dictionary from csv."""
     df = pd.read_csv(csv_path)
     assert 'smiles' in df.columns, 'smiles column not found in csv'
     desc_dict = {}
-    for row in df.iterrows():
+    for iter, row in df.iterrows():
         smiles = row['smiles']
-        desc_dict[smiles] = row.drop('smiles').values.numpy()
+        row_wo_smiles = row.drop('smiles')
+        desc_dict[smiles] = np.array(row_wo_smiles.values).astype(np.float32)
     return desc_dict
 
 
+def _get_desc_from_dict(key: str, desc_dict: Dict[str, Any]) -> np.ndarray:
+    r"""Get descriptors from dictionary."""
+    try:
+        desc = desc_dict[key]
+    except KeyError:
+        warnings.warn(f'{key} not found in the dictionary, will be set to `None`')
+        desc = None
+    return desc
+
+
 class DescFeaturizer(FeaturizerABC):
+    r"""Featurizer for descriptors.
+    
+    Args:
+        mol_desc (str): The descriptors to use. Available descriptors are 
+            'ecfp', 'rdkit', 'csv', 'dict'. (default: :obj:`None`)
+        ecfp_radius (int): The radius of ECFP. (default: :obj:`2`)
+        ecfp_n_bits (int): The number of bits of ECFP. (default: :obj:`2048`)
+        desc_csv_path (str): The path to the csv file containing descriptors. 
+            (default: :obj:`None`)
+        additional_desc_dict (dict): The dictionary containing additional 
+            descriptors. Its key is SMILES and value is the descriptors.
+            (default: :obj:`None`)
+    """
     AVAILABLE_DESC = {
         'ecfp': _get_ecfp,
         'rdkit': _get_rdkit_desc,
-        'csv': _get_desc_from_csv,
-        'dict': None}
+        'csv': _get_dict_from_csv,
+        'addi_dict': _get_desc_from_dict}
+    
     def __init__(self, 
                 mol_desc: str = None, 
                 ecfp_radius: int = 2, 
                 ecfp_n_bits: int = 2048,
                 desc_csv_path: str = None,
-                additional_desc_dict: Dict[str, torch.Tensor] = None):
+                addi_desc_dict: Dict[str, torch.Tensor] = None):
         if type(mol_desc) == str:
             desc_names = mol_desc.split(',')
         self.desc_csv_path = desc_csv_path
         self.desc_names = desc_names
         self.ecfp_radius = ecfp_radius
         self.ecfp_n_bits = ecfp_n_bits
-        self.additional_desc_dict = additional_desc_dict
+        self.additional_desc_dict = addi_desc_dict
+        
+        if 'csv' in self.desc_names and self.desc_csv_path is None:
+            raise ValueError('csv path is not provided.')
+        if 'addi_dict' in self.desc_names and self.additional_desc_dict is None:
+            raise ValueError('Additional descriptor dictionary is not provided.')
         
         for name in self.desc_names:
             if name not in self.AVAILABLE_DESC:
@@ -70,41 +104,38 @@ class DescFeaturizer(FeaturizerABC):
             self.columns.extend([x[0] for x in Descriptors._descList])
         if 'csv' in self.desc_names:
             self.columns.extend(pd.read_csv(self.desc_csv_path).columns[1:])
-        if 'dict' in self.desc_names:
-            self.columns.extend(f'desc_{i}' for i in range(len(self.additional_desc_dict)))
+        if 'addi_dict' in self.desc_names:
+            desc_length = len(list(self.additional_desc_dict.values())[0])
+            self.columns.extend(f'desc_{i}' for i in range(desc_length))
     
     def __repr__(self) -> str:
         return f'DescFeaturizer(desc_names={self.desc_names}'
     
-    def __call__(self, smiles: str, labels: Any = None) -> Optional[VecData]:
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            warnings.warn(f'Invalid smiles: {smiles}')
+    def encode(self, mol: str) -> Optional[VecData]:
+        r"""Encode a molecule to a vector data :obj:`VecData`."""
+        rdmol = Chem.MolFromSmiles(mol)
+        if rdmol is None:
+            warnings.warn(f'Invalid smiles: {mol}')
             return None
 
         desc = []
         if 'ecfp' in self.desc_names:
-            desc.append(_get_ecfp(mol, self.ecfp_radius, self.ecfp_n_bits))
+            desc.append(_get_ecfp(rdmol, self.ecfp_radius, self.ecfp_n_bits))
         if 'rdkit' in self.desc_names:
-            desc.append(_get_rdkit_desc(mol))
+            desc.append(_get_rdkit_desc(rdmol))
         if 'csv' in self.desc_names:
-            desc_dict = _get_desc_from_csv(self.desc_csv_path)
-            desc.append(desc_dict[smiles])
-        if 'dict' in self.desc_names:
-            desc.append(self.additional_desc_dict[smiles])
+            desc_dict = _get_dict_from_csv(self.desc_csv_path)
+            desc.append(_get_desc_from_dict(mol, desc_dict))
+        if 'addi_dict' in self.desc_names:
+            desc.append(_get_desc_from_dict(mol, self.additional_desc_dict))
+            if _get_desc_from_dict(mol, self.additional_desc_dict) is None:
+                return None
         desc = np.concatenate(desc)
         
         desc = torch.from_numpy(desc).float()
-        if labels is not None:
-            labels = torch.tensor(labels).float()
-        return VecData(desc, labels, smiles)
-
+        
+        return VecData(desc, None, mol)
+    
     @property
-    def input_args(self):
-        dic = {
-            'desc_names': self.desc_names,
-            'ecfp_radius': self.ecfp_radius,
-            'ecfp_n_bits': self.ecfp_n_bits,
-            'desc_csv_path': self.desc_csv_path
-        }
-        return dic
+    def arg4model(self) -> dict:
+        return {'input_dim': len(self.columns)}
