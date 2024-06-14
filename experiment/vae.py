@@ -16,7 +16,7 @@ if __name__ == '__main__':
                             vocab_path=os.path.join(pkg_path, 
                                                     'example/pubchem_cation_selfies_vocab.pkl'),
                             save_processed=True,
-                            force_reload=True,# `test` has passed
+                            force_reload=False,# `test` has passed
                             save_interval=10,
                             in_step_mode=False,
                             log_interval=5,

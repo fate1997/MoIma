@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 
 VAEPipeConfig = create_config_class('VAEPipeConfig',
-                                    'selfies_seq',
+                                    'smiles_seq',
                                     'chemical_vae',
                                     'random',
                                     'vae_loss',
