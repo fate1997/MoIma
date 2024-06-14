@@ -45,7 +45,7 @@ class VaDELossCalc:
                  pi: Tensor, 
                  mu_c: Tensor,
                  logvar_c: Tensor,
-                 current_epoch) -> Dict[str, Tensor]:
+                 current_epoch: int) -> Dict[str, Tensor]:
         r"""Calculate the loss of the VaDE model.
         
         Args:
@@ -57,6 +57,7 @@ class VaDELossCalc:
             pi (Tensor): The prior probability of c.
             mu_c (Tensor): The mean of the latent representation given c.
             logvar_c (Tensor): The log variance of the latent representation given c.
+            current_epoch (int): The current epoch.
         
         Returns:
             A dictionary of loss. The keys are :obj:`recon_loss`, :obj:`kl_loss`, 

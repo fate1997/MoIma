@@ -202,7 +202,7 @@ class VaDEPipe(PipeABC):
         
         smiles_list = []
         for new_x in new_x_cpu:
-            smiles = featurizer.decode(new_x + [1], is_raw=True)
+            smiles = featurizer.decode(torch.tensor(new_x + [1]), is_raw=True)
             smiles_list.append(smiles)
         return smiles_list
     

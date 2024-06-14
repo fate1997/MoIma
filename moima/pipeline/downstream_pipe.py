@@ -38,7 +38,7 @@ def create_downstream_config_class(class_name: str,
                                     splitter_name,
                                     loss_fn_name,
                                     scheduler_name,
-                                    [pretrained_pipe_class, pretrained_pipe_path])
+                                    addi_args=[pretrained_pipe_class, pretrained_pipe_path])
     setattr(inspect.getmodule(DownstreamPipe), class_name, Config)
     Config.__module__ = inspect.getmodule(DownstreamPipe).__name__
     return Config                             

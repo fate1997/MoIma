@@ -261,6 +261,8 @@ class PipeABC(ABC):
         self.model.train()
         if n_epoch is None:
             n_epoch = self.config.num_epochs
+        else:
+            self.config.num_epochs = n_epoch
         total_iter = len(self.loader["train"]) * n_epoch
         early_stopping = EarlyStopping(patience=self.config.patience,
                                        save_func=self.save)

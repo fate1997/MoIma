@@ -3,6 +3,7 @@ import random
 
 import numpy as np
 import pandas as pd
+import torch
 import pytest
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -131,18 +132,18 @@ def test_atom_featurizer():
              'hybridization', 'aromatic', 'num_Hs']
     for name in names:
         featurizer = AtomFeaturizer([name])
-        atom_features = featurizer(atom)
-        assert isinstance(atom_features, np.ndarray)
-        assert atom_features.ndim == 1
+        atom_features = featurizer(mol)
+        assert isinstance(atom_features, torch.Tensor)
+        assert atom_features.ndim == 2
         
     featurizer = AtomFeaturizer(['atomic_num'], {'atomic_num': {'choices': [1, 6, 7]}})
-    atom_features = featurizer(atom)
-    assert atom_features.size == 4
+    atom_features = featurizer(mol)
+    assert atom_features.size(1) == 4
     
     featurizer = AtomFeaturizer(names)
-    atom_features = featurizer(atom)
-    assert isinstance(atom_features, np.ndarray)
-    assert atom_features.ndim == 1
+    atom_features = featurizer(mol)
+    assert isinstance(atom_features, torch.Tensor)
+    assert atom_features.ndim == 2
 
 
 def test_bond_featurizer():

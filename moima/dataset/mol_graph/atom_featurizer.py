@@ -40,7 +40,7 @@ class AtomFeaturizer:
         num_features = self(mol).shape[1]
         return num_features
     
-    def __call__(self, mol: Chem.Mol):
+    def __call__(self, mol: Chem.Mol) -> torch.Tensor:
         # Atom features
         atom_features = []
         for atom in mol.GetAtoms():

@@ -30,7 +30,7 @@ def test_vade_loss():
     batch = next(iter(splitter(dataset)[0]))
     x_hat, mu, logvar, eta_c = vade(batch)
     loss_dict = loss_fn(batch, mu, logvar, x_hat, 
-                        eta_c, vade.pi_, vade.mu_c, vade.logvar_c)
+                        eta_c, vade.pi_, vade.mu_c, vade.logvar_c, 2)
     assert loss_dict.keys() == {'recon_loss', 'kl_loss', 'loss'}
 
 

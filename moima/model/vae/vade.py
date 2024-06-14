@@ -21,9 +21,11 @@ class VaDE(nn.Module):
     Args:
         vocab_size (int): Vocabulary size.
         enc_hidden_dim (int): Encoder hidden dimension.
+        enc_num_layers (int): Number of encoder layers.
         latent_dim (int): Latent dimension.
         emb_dim (int): Embedding dimension.
         dec_hidden_dim (int): Decoder hidden dimension.
+        dec_num_layers (int): Number of decoder layers.
         n_clusters (int): Number of clusters.
         dropout (float): Dropout rate.
     
@@ -42,21 +44,26 @@ class VaDE(nn.Module):
     def __init__(self, 
                  vocab_size: int=35,
                  enc_hidden_dim: int=292,
+                 enc_num_layers: int=1,
                  latent_dim: int=292,
                  emb_dim: int=128,
                  dec_hidden_dim: int=501,
+                 dec_num_layers: int=1,
                  n_clusters: int=10,
                  dropout: float=0.1):
         super().__init__()
         self.encoder = GRUEncoder(vocab_size, 
                                emb_dim, 
-                               enc_hidden_dim, 
+                               enc_hidden_dim,
+                               enc_num_layers,
                                latent_dim,
-                               dropout)
+                               dropout,
+                               num_classes=0)
         self.decoder = GRUDecoder(self.encoder.embedding, 
                                dropout, 
                                latent_dim, 
                                dec_hidden_dim, 
+                               dec_num_layers,
                                vocab_size, 
                                emb_dim)
         

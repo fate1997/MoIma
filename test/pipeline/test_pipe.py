@@ -17,7 +17,7 @@ def vae_pipe(zinc1k):
                             save_interval=50000,
                             log_interval=5,
                             vocab_size=100,
-                            num_epochs=10)
+                            num_epochs=50)
     pipe = VAEPipe(config)
     return pipe
 
