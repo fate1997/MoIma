@@ -1,4 +1,4 @@
-# **Mo**lecule **Ima**gination
+# <span style="color:#FF9EAA">Mo</span>lecule <span style="color:#FF9EAA">Ima</span>gination
 This repository contains a framework for easily building, training, and evaluating machine learning models for molecular property prediction and molecule generation. The overview of the framework is shown below.
 ![alt text](assets/framework.png)
 
