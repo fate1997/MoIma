@@ -55,7 +55,7 @@ pip install torch_geometric
 pip install torch_scatter torch_sparse -f https://data.pyg.org/whl/torch-2.3.0+cu118.html
 
 # Install other dependencies
-pip install e3nn egnn_pytorch mace_torch meeko numpy pandas pytest selfies
+pip install e3nn faenet egnn_pytorch mace_torch meeko numpy pandas pytest selfies
 ```
 
 Then, clone the repository and install the package:
