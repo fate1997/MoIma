@@ -7,6 +7,7 @@ from .mlp import MLP
 from .vae.chemical_vae import ChemicalVAE
 from .vae.vade import VaDE
 from .gnn.gat_v2 import GATv2
+from .gnn.gat_v2_salt import GATv2_Salt
 from .gnn.dimenet import DimeNet
 from .gnn.dimenet_pp import DimeNetPP
 from .gnn.faenet import FAENet
@@ -19,6 +20,7 @@ MODEL_REGISTRY = {
     "dimenet": DimeNet,
     "dimenet++": DimeNetPP,
     "faenet": FAENet,
+    "gatv2_salt": GATv2_Salt
 }
 
 

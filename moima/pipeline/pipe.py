@@ -346,7 +346,7 @@ class PipeABC(ABC):
         metrics = self.eval('test')
         print_items = []
         for k, v in metrics.items():
-            if isinstance(v, Tensor):
+            if isinstance(v, Tensor) or isinstance(v, np.ndarray):
                 v = v.item()
             if type(v) is float:
                 print_items.append(f'[{k}: {round(v, 4)}]')
@@ -365,7 +365,7 @@ class PipeABC(ABC):
         loss_dict.update(self.interested_info)
         print_items = []
         for k, v in loss_dict.items():
-            if isinstance(v, Tensor):
+            if isinstance(v, Tensor) or isinstance(v, np.ndarray):
                 v = v.item()
             if type(v) is float:
                 print_items.append(f'[{k}: {round(v, 4)}]')

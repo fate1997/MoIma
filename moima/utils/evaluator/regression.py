@@ -60,4 +60,4 @@ class RegressionMetrics:
     
     @property
     def r2(self):
-        return r2_score(self.targets, self.outputs).item()
+        return r2_score(self.targets, self.outputs)
