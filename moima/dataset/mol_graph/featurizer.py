@@ -29,7 +29,10 @@ class GraphFeaturizer(FeaturizerABC):
         self.bond_feature_names = bond_feature_names
         self.atom_featurizer = AtomFeaturizer(atom_feature_names, 
                                               atom_feature_params)
-        self.bond_featurizer = BondFeaturizer(bond_feature_names)
+        if len(bond_feature_names) > 0:
+            self.bond_featurizer = BondFeaturizer(bond_feature_names)
+        else:
+            self.bond_featurizer = None
         self.assign_pos = assign_pos
         
         if len(transform_names) > 0:
@@ -84,10 +87,13 @@ class GraphFeaturizer(FeaturizerABC):
         edge_index = torch.from_numpy(np.vstack([coo_adj.row, coo_adj.col])).long()
         
         # Bond features
-        bond_features = []
-        for i, j in zip(edge_index[0].tolist(), edge_index[1].tolist()):
-                bond_features.append(self.bond_featurizer(mol.GetBondBetweenAtoms(i, j)))
-        bond_features = torch.from_numpy(np.stack(bond_features, axis=0))
+        if self.bond_featurizer is None:
+            bond_features = None
+        else:
+            bond_features = []
+            for i, j in zip(edge_index[0].tolist(), edge_index[1].tolist()):
+                    bond_features.append(self.bond_featurizer(mol.GetBondBetweenAtoms(i, j)))
+            bond_features = torch.from_numpy(np.stack(bond_features, axis=0))
         
         # Get positions
         if self.assign_pos:
@@ -107,6 +113,17 @@ class GraphFeaturizer(FeaturizerABC):
         if hasattr(self, 'transforms'):
             for transform in self.transforms:
                 graph_data = transform(graph_data)
+        
+        if smiles.count('.') == 1:
+            comp1, comp2 = Chem.GetMolFrags(mol)
+            node_comp = torch.zeros(graph_data.num_nodes)
+            node_comp[torch.LongTensor(comp2)] = 1
+            edge_comp = torch.zeros(graph_data.num_edges)
+            comp2_tensor = torch.LongTensor([comp2])
+            edge_mask = (edge_index[0].repeat(len(comp2), 1).T == comp2_tensor).any(dim=1)
+            edge_comp[edge_mask] = 1
+            graph_data.node_comp = node_comp.long()
+            graph_data.edge_comp = edge_comp.long()
             
         return graph_data
 

@@ -1,12 +1,11 @@
 import os
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import pandas as pd
 import torch
 
 from moima.dataset._abc import DatasetABC
 from moima.dataset.mol_graph.data import GraphData
-from torch_geometric.data import Batch as GraphBatch
 from moima.dataset.mol_graph.featurizer import GraphFeaturizer
 from rdkit import Chem
 

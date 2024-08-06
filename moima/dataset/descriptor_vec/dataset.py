@@ -9,6 +9,17 @@ from moima.dataset.descriptor_vec.featurizer import DescFeaturizer
 
 
 class DescDataset(DatasetABC):
+    """Dataset for descriptor-based representation.
+    
+    Args:
+        raw_path (str): Path to the raw data.
+        featurizer (DescFeaturizer): Featurizer for the dataset.
+        label_col (str or List[str]): Column name(s) for the label.
+        additional_cols (List[str]): Additional columns to be included in the dataset.
+        processed_path (str): Path to the processed data.
+        force_reload (bool): Whether to force reload the data.
+        save_processed (bool): Whether to save the processed data.
+    """
     def __init__(self, 
                  raw_path: str, 
                  featurizer: DescFeaturizer,
