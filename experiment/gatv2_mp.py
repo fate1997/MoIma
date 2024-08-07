@@ -8,7 +8,7 @@ print(pkg_path)
 if __name__ == '__main__':
     DownstreamConfig = create_downstream_config_class('DownstreamConfig',
                                 dataset_name='graph',
-                                model_name='gatv2_salt',
+                                model_name='gat_v2',
                                 splitter_name='random',
                                 loss_fn_name='mse',
                                 scheduler_name='none')
@@ -22,7 +22,7 @@ if __name__ == '__main__':
                             num_heads=8,
                             force_reload=True,
                             assign_pos=False,
-                            desc='gatv2_wo_geo',
+                            desc='gatv2',
                             atom_feature_names=['atomic_num',
                                                 'degree',
                                                 'chiral_tag',
