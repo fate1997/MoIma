@@ -1,6 +1,6 @@
 import torch
-from torch import Tensor, nn
 import torch.nn.functional as F
+from torch import Tensor, nn
 
 from moima.dataset.smiles_seq.data import SeqBatch
 from moima.model._util import init_weight
@@ -23,39 +23,46 @@ class ChemicalVAE(nn.Module):
         * Encoder: [batch_size, seq_len] -> [batch_size, seq_len, enc_hidden_dim]
         * Decoder: [batch_size, seq_len, latent_dim] -> [batch_size, seq_len, vocab_size]
     """
-    def __init__(self, 
-                 vocab_size: int=35,
-                 enc_hidden_dim: int=292,
-                 enc_num_layers: int=1,
-                 latent_dim: int=292,
-                 emb_dim: int=128,
-                 dec_hidden_dim: int=501,
-                 dec_num_layers: int=1,
-                 dropout: float=0.1,
-                 consider_label: bool=False,
-                 num_classes: int=0):
+    def __init__(
+        self, 
+        vocab_size: int=35,
+        enc_hidden_dim: int=292,
+        enc_num_layers: int=1,
+        latent_dim: int=292,
+        emb_dim: int=128,
+        dec_hidden_dim: int=501,
+        dec_num_layers: int=1,
+        dropout: float=0.1,
+        consider_label: bool=False,
+        num_classes: int=0
+    ):
         super().__init__()
-        self.encoder = GRUEncoder(vocab_size, 
-                               emb_dim, 
-                               enc_hidden_dim,
-                               enc_num_layers,
-                               latent_dim,
-                               dropout,
-                               num_classes=num_classes)
-        self.decoder = GRUDecoder(self.encoder.embedding, 
-                               dropout, 
-                               latent_dim+num_classes, 
-                               dec_hidden_dim, 
-                               dec_num_layers,
-                               vocab_size, 
-                               emb_dim)
+        self.encoder = GRUEncoder(
+            vocab_size, 
+            emb_dim, 
+            enc_hidden_dim,
+            enc_num_layers,
+            latent_dim,
+            dropout,
+            num_classes=num_classes
+        )
+        self.decoder = GRUDecoder(
+            self.encoder.embedding, 
+            dropout, 
+            latent_dim+num_classes, 
+            dec_hidden_dim, 
+            dec_num_layers,
+            vocab_size, 
+            emb_dim
+        )
         self.consider_label = consider_label
         if consider_label:
             self.label_embedding = nn.Embedding(3, emb_dim)
             self.label_embedding.apply(init_weight)
             self.nanlabel_embedding = nn.Embedding(2, emb_dim)
-            self.nanlabel_embedding.weight.data = torch.stack([torch.zeros(emb_dim), 
-                                                               torch.ones(emb_dim)]).to(self.nanlabel_embedding.weight.device)
+            self.nanlabel_embedding.weight.data = torch.stack(
+                [torch.zeros(emb_dim), torch.ones(emb_dim)]
+            ).to(self.nanlabel_embedding.weight.device)
             self.nanlabel_embedding.weight.requires_grad = False
         self.num_classes = num_classes
         if self.num_classes != 0:

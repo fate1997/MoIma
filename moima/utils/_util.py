@@ -2,6 +2,7 @@ import logging
 import logging.config
 import os
 import sys
+import random
 
 import numpy as np
 import torch
@@ -64,3 +65,22 @@ class EarlyStopping:
             self.best_score = score
             self.last_save_path = self.save_func(verbose=False)
             self.counter = 0
+
+def set_random_seed(seed: int=42) -> None:
+    """Set random seed globally."""
+    # python and numpy
+    np.random.seed(seed)
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+
+    # torch cpu
+    torch.manual_seed(seed)
+    # torch gpu
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.cuda.manual_seed(seed)
+
+    # cudnn
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.enabled = False

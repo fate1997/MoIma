@@ -1,12 +1,14 @@
-from moima.dataset.mol_graph.data import GraphData
-from torch import Tensor
-from faenet.model import FAENet as FAENetBase
-from faenet.fa_forward import model_forward
-import torch
 from copy import deepcopy
-from torch import nn
+
+import torch
 from egnn_pytorch import EGNN_Sparse
+from faenet.fa_forward import model_forward
+from faenet.model import FAENet as FAENetBase
+from torch import Tensor, nn
 from torch_geometric.nn import radius_graph
+
+from moima.dataset.mol_graph.data import GraphData
+
 
 def nan_to_num(vec, num=0.0):
     idx = torch.isnan(vec)
@@ -19,38 +21,44 @@ def _normalize(vec, dim=-1):
 
 
 class FAENet(FAENetBase):
-    def __init__(self, 
-                 cutoff: float = 6, 
-                 act: str = "swish", 
-                 preprocess: str = "base_preprocess", 
-                 complex_mp: bool = True, 
-                 max_num_neighbors: int = 30, 
-                 num_gaussians: int = 100, 
-                 num_filters: int = 480, 
-                 hidden_channels: int = 400, 
-                 tag_hidden_channels: int = 0, 
-                 pg_hidden_channels: int = 32, 
-                 phys_hidden_channels: int = 0, 
-                 phys_embeds: bool = False, 
-                 num_interactions: int = 5, 
-                 mp_type: str = "updownscale_base", 
-                 graph_norm: bool = True, 
-                 second_layer_MLP: bool = True, 
-                 skip_co: str = "False", 
-                 energy_head: str = '', 
-                 regress_forces: str = '', 
-                 force_decoder_type: str  = "mlp",
-                 trainable_pca: bool=False,
-                 num_atom_features: int = 85,):
-        super().__init__(cutoff, act, preprocess, complex_mp, max_num_neighbors, num_gaussians, num_filters, 
-                         hidden_channels, tag_hidden_channels, pg_hidden_channels, phys_hidden_channels, 
-                         phys_embeds, num_interactions, mp_type, graph_norm, second_layer_MLP, skip_co, 
-                         energy_head, regress_forces, force_decoder_type, None)
+    """FAENet model wrapper."""
+    def __init__(
+        self, 
+        cutoff: float = 6, 
+        act: str = "swish", 
+        preprocess: str = "base_preprocess", 
+        complex_mp: bool = True, 
+        max_num_neighbors: int = 30, 
+        num_gaussians: int = 100, 
+        num_filters: int = 480, 
+        hidden_channels: int = 400, 
+        tag_hidden_channels: int = 0, 
+        pg_hidden_channels: int = 32, 
+        phys_hidden_channels: int = 0, 
+        phys_embeds: bool = False, 
+        num_interactions: int = 5, 
+        mp_type: str = "updownscale_base", 
+        graph_norm: bool = True, 
+        second_layer_MLP: bool = True, 
+        skip_co: str = "False", 
+        energy_head: str = '', 
+        regress_forces: str = '', 
+        force_decoder_type: str  = "mlp",
+        trainable_pca: bool=False,
+        num_atom_features: int = 85,
+    ):
+        super().__init__(
+            cutoff, act, preprocess, complex_mp, max_num_neighbors, 
+            num_gaussians, num_filters, hidden_channels, tag_hidden_channels, 
+            pg_hidden_channels, phys_hidden_channels, phys_embeds, 
+            num_interactions, mp_type, graph_norm, second_layer_MLP, skip_co, 
+            energy_head, regress_forces, force_decoder_type, None
+        )
         self.trainable_pca = trainable_pca
-        if self.trainable_pca and False:
-            print("Using trainable PCA")
-            self.embdding = nn.Embedding(85, 2) # 128 -> 2
-            self.embdding.reset_parameters()
+        # if self.trainable_pca:
+        #     print("Using trainable PCA")
+        #     self.embdding = nn.Embedding(85, 2) # 128 -> 2
+        #     self.embdding.reset_parameters()
         if self.trainable_pca:
             print("Using trainable PCA")
             self.egnn_layer = EGNN_Sparse(num_atom_features)
@@ -73,10 +81,7 @@ class FAENet(FAENetBase):
             atomic_emb = self.embdding(batch.z)
             """
             input_feats = torch.cat([batch.pos, batch.x], dim=-1)
-            edge_index = radius_graph(
-                        batch.pos,
-                        r=5,
-                        batch=batch.batch)
+            edge_index = radius_graph(batch.pos, r=5, batch=batch.batch)
             output_feats = self.egnn_layer(input_feats, edge_index)
             pos, feats = output_feats[:, :3], output_feats[:, 3:]
             atomic_emb = self.feat_proj(feats)
@@ -91,7 +96,11 @@ class FAENet(FAENetBase):
             node_cross = _normalize(node_cross)
             node_vertical = torch.cross(node_diff, node_cross)
             # node_frame shape: (num_nodes, 3, 3)
-            node_frame = torch.cat((node_diff.unsqueeze(-1), node_cross.unsqueeze(-1), node_vertical.unsqueeze(-1)), dim=-1)
+            node_frame = torch.cat((
+                node_diff.unsqueeze(-1), 
+                node_cross.unsqueeze(-1), 
+                node_vertical.unsqueeze(-1)
+            ), dim=-1)
             eigenvec = node_frame
             # # Eigendecomposition
             # C = torch.matmul(pos_emb.t(), pos_emb)

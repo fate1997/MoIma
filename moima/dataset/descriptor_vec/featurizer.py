@@ -9,17 +9,18 @@ from rdkit.Chem import AllChem, Descriptors
 from rdkit.ML.Descriptors.MoleculeDescriptors import \
     MolecularDescriptorCalculator
 
-from moima.dataset._abc import DataABC, FeaturizerABC
+from moima.dataset._abc import FeaturizerABC
 from moima.dataset.descriptor_vec.data import VecData
-from moima.typing import MolRepr
 
 
 def _get_ecfp(mol: Chem.Mol, radius: int, n_bits: int) -> np.ndarray:
     r"""Get ECFP fingerprint."""
-    morgan_fingerprint = AllChem.GetMorganFingerprintAsBitVect(mol, 
-                                                            radius, 
-                                                            n_bits, 
-                                                            useChirality=True)
+    morgan_fingerprint = AllChem.GetMorganFingerprintAsBitVect(
+        mol, 
+        radius, 
+        n_bits, 
+        useChirality=True
+    )
     morgan_fingerprint_array = np.zeros((1,))
     DataStructs.ConvertToNumpyArray(morgan_fingerprint, morgan_fingerprint_array)
     return morgan_fingerprint_array
@@ -74,12 +75,14 @@ class DescFeaturizer(FeaturizerABC):
         'csv': _get_dict_from_csv,
         'addi_dict': _get_desc_from_dict}
     
-    def __init__(self, 
-                mol_desc: str = None, 
-                ecfp_radius: int = 2, 
-                ecfp_n_bits: int = 2048,
-                desc_csv_path: str = None,
-                addi_desc_dict: Dict[str, torch.Tensor] = None):
+    def __init__(
+        self, 
+        mol_desc: str = None, 
+        ecfp_radius: int = 2, 
+        ecfp_n_bits: int = 2048,
+        desc_csv_path: str = None,
+        addi_desc_dict: Dict[str, torch.Tensor] = None
+    ):
         if type(mol_desc) == str:
             desc_names = mol_desc.split(',')
         self.desc_csv_path = desc_csv_path
@@ -131,11 +134,9 @@ class DescFeaturizer(FeaturizerABC):
             if _get_desc_from_dict(mol, self.additional_desc_dict) is None:
                 return None
         desc = np.concatenate(desc)
-        
         desc = torch.from_numpy(desc).float()
-        
         return VecData(desc, None, mol)
-    
+
     @property
     def arg4model(self) -> dict:
         return {'input_dim': len(self.columns)}

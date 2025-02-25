@@ -3,14 +3,15 @@ from typing import List
 
 from torch import nn
 
-from .mlp import MLP
-from .vae.chemical_vae import ChemicalVAE
-from .vae.vade import VaDE
-from .gnn.gat_v2 import GATv2
-from .gnn.gat_v2_salt import GATv2_Salt
 from .gnn.dimenet import DimeNet
 from .gnn.dimenet_pp import DimeNetPP
 from .gnn.faenet import FAENet
+from .gnn.gat_v2 import GATv2
+from .gnn.gat_v2_salt import GATv2_Salt
+from .gnn.gatv2_pyg import GATv2_PyG
+from .mlp import MLP
+from .vae.chemical_vae import ChemicalVAE
+from .vae.vade import VaDE
 
 MODEL_REGISTRY = {
     "chemical_vae": ChemicalVAE,
@@ -20,7 +21,8 @@ MODEL_REGISTRY = {
     "dimenet": DimeNet,
     "dimenet++": DimeNetPP,
     "faenet": FAENet,
-    "gatv2_salt": GATv2_Salt
+    "gatv2_salt": GATv2_Salt,
+    "gatv2_pyg": GATv2_PyG,
 }
 
 

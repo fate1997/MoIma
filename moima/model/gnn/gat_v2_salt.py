@@ -1,14 +1,15 @@
-import torch
-import torch.nn as nn
-from moima.dataset.mol_graph.data import GraphData
-from torch_geometric.nn import global_max_pool, global_add_pool
-from .._util import init_weight, get_activation, MLP
-
 from typing import List, Tuple
 
-from e3nn.o3 import spherical_harmonics
+import torch
+import torch.nn as nn
 from e3nn.nn import FullyConnectedNet
+from e3nn.o3 import spherical_harmonics
 from mace.modules.blocks import RadialEmbeddingBlock
+from torch_geometric.nn import global_add_pool, global_max_pool
+
+from moima.dataset.mol_graph.data import GraphData
+
+from .._util import MLP, get_activation, init_weight
 
 
 def seed_all():
@@ -17,10 +18,21 @@ def seed_all():
 
 
 class GATv2_Salt(nn.Module):
-    def __init__(self, num_atom_features: int, hidden_dim: int, num_layers: int, 
-                 num_heads: int, pred_hidden_dim: int=128, pred_dropout: float=0.2, pred_layers:int=2,
-                 activation: str='prelu', residual: bool = True, num_tasks: int = 1,
-                 bias: bool = True, dropout: float = 0.1):
+    def __init__(
+        self, 
+        num_atom_features: int, 
+        hidden_dim: int, 
+        num_layers: int, 
+        num_heads: int, 
+        pred_hidden_dim: int=128, 
+        pred_dropout: float=0.2, 
+        pred_layers:int=2,
+        activation: str='prelu', 
+        residual: bool = True, 
+        num_tasks: int = 1,
+        bias: bool = True, 
+        dropout: float = 0.1
+    ):
         super(GATv2_Salt, self).__init__()
 
         # update phase
@@ -48,24 +60,14 @@ class GATv2_Salt(nn.Module):
         self.atom_weighting.apply(init_weight)
 
         # prediction phase
-        self.predict = MLP(input_dim=feature_per_layer[-1] * 2 * 2,
-                           hidden_dim=pred_hidden_dim,
-                           output_dim=num_tasks,
-                           n_layers=pred_layers,
-                           dropout=pred_dropout,
-                           activation=activation)
-
-        # For debugging
-        self.linear_x = nn.Linear(num_atom_features, 64)
-        self.linear_x.apply(init_weight)
-        self.radial_basis_function = RadialEmbeddingBlock(r_max=5, num_bessel=8, num_polynomial_cutoff=6)
-        self.radial_mlp = MLP(input_dim=8, 
-                              hidden_dim=64, 
-                              output_dim=64, 
-                              n_layers=2, 
-                              dropout=0.1, 
-                              activation='prelu')
-        
+        self.predict = MLP(
+            input_dim=feature_per_layer[-1] * 2 * 2,
+            hidden_dim=pred_hidden_dim,
+            output_dim=num_tasks,
+            n_layers=pred_layers,
+            dropout=pred_dropout,
+            activation=activation
+        )        
         
     def forward(self, batch: GraphData): 
         output, _,= self.gat((batch.x, batch.edge_index))

@@ -1,3 +1,4 @@
+# For Frame Averaging Method
 import torch
 import random
 from itertools import product, permutations

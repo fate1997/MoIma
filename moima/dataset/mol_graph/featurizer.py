@@ -1,30 +1,33 @@
 import pickle
 import warnings
 from copy import deepcopy
-import numpy as np
-from typing import List, Dict
-from scipy.sparse import coo_matrix
+from typing import Dict, List
 
+import numpy as np
 import torch
 from rdkit import Chem
+from rdkit.Chem import AllChem
+from scipy.sparse import coo_matrix
 from tqdm import tqdm
 
 from moima.dataset._abc import FeaturizerABC
-from moima.dataset.mol_graph.data import GraphData
 from moima.dataset.mol_graph.atom_featurizer import AtomFeaturizer
 from moima.dataset.mol_graph.bond_featurizer import BondFeaturizer
+from moima.dataset.mol_graph.data import GraphData
 from moima.dataset.mol_graph.transform import get_transform
 from moima.typing import MolRepr
 
 
 class GraphFeaturizer(FeaturizerABC):
         
-    def __init__(self, 
-                 atom_feature_names: List[str],
-                 bond_feature_names: List[str]=[],
-                 atom_feature_params: Dict[str, dict]={},
-                 assign_pos: bool = False,
-                 transform_names: List[str]=[],):
+    def __init__(
+        self, 
+        atom_feature_names: List[str],
+        bond_feature_names: List[str]=[],
+        atom_feature_params: Dict[str, dict]={},
+        assign_pos: bool = False,
+        transform_names: List[str]=[],
+    ):
         self.atom_feature_names = atom_feature_names
         self.bond_feature_names = bond_feature_names
         self.atom_featurizer = AtomFeaturizer(atom_feature_names, 
@@ -45,25 +48,26 @@ class GraphFeaturizer(FeaturizerABC):
         if mol.GetNumConformers() == 0:
             return
         else:
-            pos = mol.GetConformer().GetPositions()
-            from sklearn.decomposition import PCA
-            import random
-            pos = pos - np.mean(pos, axis=0)
-            pca = PCA(n_components=3)
-            pca.fit(pos)
-            comp = pca.components_
-            sign_variants = np.array([[1, 1, 1],
-                            [1, 1, -1],
-                            [1, -1, 1],
-                            [1, -1, -1],
-                            [-1, 1, 1],
-                            [-1, 1, -1],
-                            [-1, -1, 1],
-                            [-1, -1, -1]])
-            index = random.randint(0, sign_variants.shape[0] - 1)
-            sign = sign_variants[index]
-            comp = comp * sign
-            pos = np.dot(pos, comp.T)
+            # pos = mol.GetConformer().GetPositions()
+            # import random
+
+            # from sklearn.decomposition import PCA
+            # pos = pos - np.mean(pos, axis=0)
+            # pca = PCA(n_components=3)
+            # pca.fit(pos)
+            # comp = pca.components_
+            # sign_variants = np.array([[1, 1, 1],
+            #                 [1, 1, -1],
+            #                 [1, -1, 1],
+            #                 [1, -1, -1],
+            #                 [-1, 1, 1],
+            #                 [-1, 1, -1],
+            #                 [-1, -1, 1],
+            #                 [-1, -1, -1]])
+            # index = random.randint(0, sign_variants.shape[0] - 1)
+            # sign = sign_variants[index]
+            # comp = comp * sign
+            # pos = np.dot(pos, comp.T)
             # return torch.as_tensor(pos).float()
             return torch.as_tensor(mol.GetConformer().GetPositions()).float()
     
@@ -102,12 +106,14 @@ class GraphFeaturizer(FeaturizerABC):
             pos = None
         
         # Construct the graph data
-        graph_data = GraphData(x=atom_features, 
-                               edge_index=edge_index, 
-                               edge_attr=bond_features,
-                               smiles=smiles,
-                               pos=pos,
-                               z=z)
+        graph_data = GraphData(
+            x=atom_features, 
+            edge_index=edge_index, 
+            edge_attr=bond_features,
+            smiles=smiles,
+            pos=pos,
+            z=z
+        )
         
         # Apply the transform
         if hasattr(self, 'transforms'):
@@ -124,6 +130,11 @@ class GraphFeaturizer(FeaturizerABC):
             edge_comp[edge_mask] = 1
             graph_data.node_comp = node_comp.long()
             graph_data.edge_comp = edge_comp.long()
+            cross_comp_index = torch.cartesian_prod(torch.where(node_comp==0)[0],
+                                                    torch.where(node_comp==1)[0])
+            cross_comp_index = torch.cat([cross_comp_index, 
+                                          cross_comp_index.flip(1)], dim=0)
+            graph_data.cross_comp_index = cross_comp_index.T
             
         return graph_data
 

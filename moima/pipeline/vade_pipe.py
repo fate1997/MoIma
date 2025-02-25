@@ -13,31 +13,40 @@ from moima.dataset.smiles_seq.data import SeqBatch
 from moima.utils.evaluator.generation import GenerationMetrics
 
 
-VaDEPipeConfig = create_config_class('VaDEPipeConfig',
-                                        'smiles_seq',
-                                        'vade',
-                                        'random',
-                                        'vade_loss',
-                                        'none')
+VaDEPipeConfig = create_config_class(
+    'VaDEPipeConfig',
+    'smiles_seq',
+    'vade',
+    'random',
+    'vade_loss',
+    'none'
+)
 
 
 class VaDEPipe(PipeABC):
-    def __init__(self, 
-                 config: VaDEPipeConfig,
-                 featurizer: FeaturizerABC = None,
-                 model_state_dict: Dict[str, Any] = None,
-                 optimizer_state_dict: Dict[str, Any] = None,
-                 scheduler_state_dict: Dict[str, Any] = None,
-                 is_training: bool = True):
-        super().__init__(config, 
-                         featurizer,
-                         model_state_dict, 
-                         optimizer_state_dict, 
-                         scheduler_state_dict,
-                         is_training)
+    def __init__(
+        self, 
+        config: VaDEPipeConfig,
+        featurizer: FeaturizerABC = None,
+        model_state_dict: Dict[str, Any] = None,
+        optimizer_state_dict: Dict[str, Any] = None,
+        scheduler_state_dict: Dict[str, Any] = None,
+        is_training: bool = True
+    ):
+        super().__init__(
+            config, 
+            featurizer,
+            model_state_dict, 
+            optimizer_state_dict, 
+            scheduler_state_dict,
+            is_training
+        )
     
-    def _forward_batch(self, batch: SeqBatch, calc_loss=True) -> Tuple[Tensor, 
-                                                       Dict[str, Tensor]]:
+    def _forward_batch(
+        self, 
+        batch: SeqBatch, 
+        calc_loss=True
+    ) -> Tuple[Tensor, Dict[str, Tensor]]:
         r"""Forward a batch of data.
         
         Args:
@@ -51,11 +60,13 @@ class VaDEPipe(PipeABC):
         x_hat, mu, logvar, log_eta_c = self.model(batch, is_pretrain=False)
         loss_dict = {}
         if calc_loss:
-            loss_dict = self.loss_fn(batch, mu, logvar, x_hat, log_eta_c, 
-                                    self.model.pi_, 
-                                    self.model.mu_c,
-                                    self.model.logvar_c,
-                                    self.current_epoch)
+            loss_dict = self.loss_fn(
+                batch, mu, logvar, x_hat, log_eta_c, 
+                self.model.pi_, 
+                self.model.mu_c,
+                self.model.logvar_c,
+                self.current_epoch
+            )
         info = {}
         info['Label'] = self.featurizer.decode(batch.x[0], is_raw=True)
         info['Reconstruction'] = self.featurizer.decode(x_hat[0], is_raw=False)
@@ -65,9 +76,11 @@ class VaDEPipe(PipeABC):
     def eval(self, loader_name: str='test'):
         self.logger.info('Evaluating'.center(60, "-"))
         loader = self.loader['train']
-        train_smiles = self.batch_flatten(loader, 
-                                          register_items=['smiles'],
-                                          register_output=False)['smiles']
+        train_smiles = self.batch_flatten(
+            loader, 
+            register_items=['smiles'],
+            register_output=False
+        )['smiles']
         loader = self.loader[loader_name]
         eval_outputs = self.batch_flatten(loader, register_items=['smiles'])
         eval_smiles = eval_outputs['smiles']
@@ -80,10 +93,12 @@ class VaDEPipe(PipeABC):
                 for x in batch_x:
                     eval_recon_smiles.append(self.featurizer.decode(x, is_raw=False))
         sampled_smiles = self.sample(10000)
-        metrics = GenerationMetrics(sampled_smiles,
-                                    train_smiles,
-                                    eval_smiles,
-                                    eval_recon_smiles)
+        metrics = GenerationMetrics(
+            sampled_smiles,
+            train_smiles,
+            eval_smiles,
+            eval_recon_smiles
+        )
         return metrics.get_metrics()
     
     def set_interested_info(self):

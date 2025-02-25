@@ -24,18 +24,25 @@ class SeqDataset(DatasetABC):
         save_processed (bool): Whether to save the processed data. (default:
             :obj:`False`)
     """
-    def __init__(self, 
-                 raw_path: str,
-                 additional_cols: List[str] = [],
-                 featurizer: SeqFeaturizer = None,
-                 vocab_path: str = None,
-                 processed_path: str = None,
-                 force_reload: bool = False,
-                 save_processed: bool = False):
+    def __init__(
+        self, 
+        raw_path: str,
+        additional_cols: List[str] = [],
+        featurizer: SeqFeaturizer = None,
+        vocab_path: str = None,
+        processed_path: str = None,
+        force_reload: bool = False,
+        save_processed: bool = False
+    ):
         self.vocab_path = vocab_path
         self.additional_cols = additional_cols
-        super().__init__(raw_path, featurizer, processed_path, 
-                         force_reload, save_processed)
+        super().__init__(
+            raw_path, 
+            featurizer, 
+            processed_path, 
+            force_reload, 
+            save_processed
+        )
     
     @staticmethod
     def collate_fn(batch: List[SeqData]) -> SeqBatch:

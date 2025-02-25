@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import Dict, Tuple
 
 import numpy as np
 import torch
@@ -41,39 +41,47 @@ class VaDE(nn.Module):
         * n_clusters (int): Number of clusters.
         * latent_dim (int): Latent dimension.
     """
-    def __init__(self, 
-                 vocab_size: int=35,
-                 enc_hidden_dim: int=292,
-                 enc_num_layers: int=1,
-                 latent_dim: int=292,
-                 emb_dim: int=128,
-                 dec_hidden_dim: int=501,
-                 dec_num_layers: int=1,
-                 n_clusters: int=10,
-                 dropout: float=0.1):
+    def __init__(
+        self, 
+        vocab_size: int=35,
+        enc_hidden_dim: int=292,
+        enc_num_layers: int=1,
+        latent_dim: int=292,
+        emb_dim: int=128,
+        dec_hidden_dim: int=501,
+        dec_num_layers: int=1,
+        n_clusters: int=10,
+        dropout: float=0.1
+    ):
         super().__init__()
-        self.encoder = GRUEncoder(vocab_size, 
-                               emb_dim, 
-                               enc_hidden_dim,
-                               enc_num_layers,
-                               latent_dim,
-                               dropout,
-                               num_classes=0)
-        self.decoder = GRUDecoder(self.encoder.embedding, 
-                               dropout, 
-                               latent_dim, 
-                               dec_hidden_dim, 
-                               dec_num_layers,
-                               vocab_size, 
-                               emb_dim)
+        self.encoder = GRUEncoder(
+            vocab_size, 
+            emb_dim, 
+            enc_hidden_dim,
+            enc_num_layers,
+            latent_dim,
+            dropout,
+            num_classes=0
+        )
+        self.decoder = GRUDecoder(
+            self.encoder.embedding, 
+            dropout, 
+            latent_dim, 
+            dec_hidden_dim, 
+            dec_num_layers,
+            vocab_size, 
+            emb_dim
+        )
         
         # Additional parameters to define the Gaussian mixture model
         self.pi_unnorm = nn.Parameter(torch.FloatTensor(n_clusters, ).fill_(1)/n_clusters, requires_grad=True)
         self.mu_c = nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
         self.logvar_c = nn.Parameter(torch.FloatTensor(n_clusters, latent_dim).fill_(0), requires_grad=True)
-        self.gmm = GaussianMixture(n_components=n_clusters,
-                                   covariance_type='diag', 
-                                   random_state=3)
+        self.gmm = GaussianMixture(
+            n_components=n_clusters,
+            covariance_type='diag', 
+            random_state=3
+        )
         self.n_clusters = n_clusters
         self.latent_dim = latent_dim
         

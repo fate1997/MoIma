@@ -86,12 +86,14 @@ class DatasetABC(Dataset):
             :obj:`False`)
     """
     
-    def __init__(self,
-                 raw_path: str,
-                 featurizer: FeaturizerABC,
-                 processed_path: str=None,
-                 force_reload: bool=False,
-                 save_processed: bool=False):
+    def __init__(
+        self,
+        raw_path: str,
+        featurizer: FeaturizerABC,
+        processed_path: str=None,
+        force_reload: bool=False,
+        save_processed: bool=False
+    ):
         super().__init__()
         self.raw_path = raw_path
         self.featurizer = featurizer
@@ -99,7 +101,7 @@ class DatasetABC(Dataset):
         self.save_processed = save_processed
         self.processed_path = processed_path
         
-        if processed_path is None:
+        if not processed_path:
             processed_path = os.path.splitext(raw_path)[0] + '.pt'
         
         if os.path.exists(processed_path) and not force_reload:

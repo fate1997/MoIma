@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import inspect
+from inspect import getfullargspec
 import json
 from dataclasses import Field, dataclass, field, make_dataclass
 from enum import Enum
@@ -11,9 +12,9 @@ import yaml
 from moima.dataset import DATASET_REGISTRY, FEATURIZER_REGISTRY
 from moima.model import MODEL_REGISTRY
 from moima.utils.loss_fn import LOSS_FN_REGISTRY
+from moima.utils.optimizers import OPTIMIZER_REGISTRY
 from moima.utils.schedulers import SCHEDULER_REGISTRY
 from moima.utils.splitter import SPLITTER_REGISTRY
-from moima.utils.optimizers import OPTIMIZER_REGISTRY
 
 
 class ArgType(Enum):
@@ -32,61 +33,63 @@ NAME_BAG = ['dataset', 'model', 'splitter', 'loss_fn', 'featurizer', 'scheduler'
 @dataclass
 class Config:
     r"""Default config for the pipeline.
-    
-    Attributes:
-        num_epochs (int): Number of epochs.
-        log_interval (int): The interval of logging.
-        save_interval (int): The interval of saving.
-        output_folder (str): The output folder.
-        lr (float): The learning rate.
-        desc (str): The description of the experiment.
-        device (str): The device to use.
-        patience (int): The patience of early stop.
-        early_stop_metric (str): The metric of early stop.
-        in_step_mode (bool): Whether to log/save/early_stop in step mode.
-        show_tqdm (bool): Whether to show tqdm.
-        warmup_interval (int): The interval of warmup.    
     """
     # General
-    num_epochs: int = field(default=100,
-                            metadata={'help': 'Number of epochs.',
-                                        'type': ArgType.GENERAL})
-    log_interval: int = field(default=1000,
-                                metadata={'help': 'The interval of logging.',
-                                        'type': ArgType.GENERAL})
-    save_interval: int = field(default=5000,
-                                metadata={'help': 'The interval of saving.',
-                                        'type': ArgType.GENERAL})
-    output_folder: str = field(default='output',
-                                metadata={'help': 'The output folder.',
-                                        'type': ArgType.GENERAL})
-    lr: float = field(default=1e-3,
-                        metadata={'help': 'The learning rate.',
-                                    'type': ArgType.GENERAL})
-    desc: str = field(default='default',
-                      metadata={'help': 'The description of the experiment.',
-                                'type': ArgType.GENERAL})
-    device: str = field(default='cuda',
-                        metadata={'help': 'The device to use.',
-                                'type': ArgType.GENERAL})
-    patience: int = field(default=-1,
-                          metadata={'help': 'The patience of early stop.',
-                                     'type': ArgType.GENERAL})
-    early_stop_metric: str = field(default='val_MAE',
-                                   metadata={'help': 'The metric of early stop.',
-                                             'type': ArgType.GENERAL})
-    in_step_mode: bool = field(default=False,
-                               metadata={'help': 'Whether to log/save/early_stop in step mode.',
-                                         'type': ArgType.GENERAL})
-    show_tqdm: bool = field(default=False,
-                            metadata={'help': 'Whether to show tqdm.',
-                                      'type': ArgType.GENERAL})
-    warmup_interval: int = field(default=0,
-                                    metadata={'help': 'The interval of warmup.',
-                                            'type': ArgType.GENERAL})
-    scheduler_interval: int = field(default=1,
-                                    metadata={'help': 'The interval of scheduler.',
-                                            'type': ArgType.GENERAL})
+    num_epochs: int = field(
+        default=100,
+        metadata={'help': 'Number of epochs.', 'type': ArgType.GENERAL}
+    )
+    log_interval: int = field(
+        default=1000,
+        metadata={'help': 'The interval of logging.', 'type': ArgType.GENERAL}
+    )
+    save_interval: int = field(
+        default=5000, 
+        metadata={'help': 'The interval of saving.', 'type': ArgType.GENERAL}
+    )
+    output_folder: str = field(
+        default='output',
+        metadata={'help': 'The output folder.', 'type': ArgType.GENERAL}
+    )
+    lr: float = field(
+        default=1e-3,
+        metadata={'help': 'The learning rate.', 'type': ArgType.GENERAL}
+    )
+    desc: str = field(
+        default='default',
+        metadata={'help': 'The description.', 'type': ArgType.GENERAL}
+    )
+    device: str = field(
+        default='cuda',
+        metadata={'help': 'The device to use.', 'type': ArgType.GENERAL}
+    )
+    patience: int = field(
+        default=-1,
+        metadata={'help': 'The patience of early stop.', 'type': ArgType.GENERAL}
+    )
+    early_stop_metric: str = field(
+        default='val_MAE',
+        metadata={'help': 'The metric of early stop.', 'type': ArgType.GENERAL}
+    )
+    in_step_mode: bool = field(
+        default=False,
+        metadata={
+            'help': 'Whether to log/save/early_stop in step mode.',
+            'type': ArgType.GENERAL
+        }
+    )
+    show_tqdm: bool = field(
+        default=False,
+        metadata={'help': 'Whether to show tqdm.', 'type': ArgType.GENERAL}
+    )
+    warmup_interval: int = field(
+        default=0,
+        metadata={'help': 'The interval of warmup.', 'type': ArgType.GENERAL}
+    )
+    scheduler_interval: int = field(
+        default=1, 
+        metadata={'help': 'The interval of scheduler.', 'type': ArgType.GENERAL}
+    )
     
     def __post_init__(self):
         r"""Set the default value of the fields to the input value."""
@@ -223,35 +226,48 @@ class Config:
     @classmethod
     def from_args(cls) -> 'Config':
         r"""Create a config from the command line arguments."""
-        parser =  argparse.ArgumentParser(description='Parser For Arguments', 
-                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser =  argparse.ArgumentParser(
+            description='Parser For Arguments', 
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        )
+        
         for k, v in cls.__dataclass_fields__.items():
-            parser.add_argument(f'--{k}', 
-                                type=v.type, 
-                                default=v.default, 
-                                help=f'{v.metadata["help"]}',
-                                choices=v.metadata.get('choices', None))
+            parser.add_argument(
+                f'--{k}', 
+                type=v.type, 
+                default=v.default, 
+                help=f'{v.metadata["help"]}',
+                choices=v.metadata.get('choices', None)
+            )
         args = parser.parse_args()
         return cls(**vars(args))
     
     def update_from_args(self):
         r"""Update the config from the command line arguments."""
-        parser =  argparse.ArgumentParser(description='Parser For Arguments', 
-                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser =  argparse.ArgumentParser(
+            description='Parser For Arguments', 
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        )
         for k, v in self.__dataclass_fields__.items():
-            parser.add_argument(f'--{k}', 
-                                type=v.type, 
-                                default=v.default, 
-                                help=v.metadata.get('help', None),
-                                choices=v.metadata.get('choices', None))
+            if v.type == Any:
+                continue
+            parser.add_argument(
+                f'--{k}', 
+                type=v.type, 
+                default=v.default, 
+                help=v.metadata.get('help', None),
+                choices=v.metadata.get('choices', None)
+            )
         args = parser.parse_args()
         for k, v in vars(args).items():
             setattr(self, k, v)
 
 
-def get_arg_fields(arg_spec: inspect.FullArgSpec, 
-                   arg_type: ArgType,
-                   exclude_args: List[str]=[]) -> List[tuple]:
+def get_arg_fields(
+    arg_spec: inspect.FullArgSpec, 
+    arg_type: ArgType,
+    exclude_args: List[str]=[]
+) -> List[tuple]:
     r"""Get the fields from the arg spec."""
     fields_list = []
     for i, arg in enumerate(reversed(arg_spec.args)):
@@ -279,52 +295,95 @@ def get_arg_fields(arg_spec: inspect.FullArgSpec,
     return fields_list
 
 
-def create_config_class(class_name: str,
-                        dataset_name: str,
-                        model_name: str,
-                        splitter_name: str,
-                        loss_fn_name: str,
-                        scheduler_name: str,
-                        featurizer_name: str=None,
-                        addi_args: List[Tuple[str, type, Field]] = []):
-    dataset_arg_spec = inspect.getfullargspec(DATASET_REGISTRY[dataset_name])
-    model_arg_spec = inspect.getfullargspec(MODEL_REGISTRY[model_name])
-    splitter_arg_spec = inspect.getfullargspec(SPLITTER_REGISTRY[splitter_name])
-    loss_fn_arg_spec = inspect.getfullargspec(LOSS_FN_REGISTRY[loss_fn_name])
-    featurizer_arg_spec = inspect.getfullargspec(FEATURIZER_REGISTRY[dataset_name])
+def create_config_class(
+    class_name: str,
+    dataset_name: str,
+    model_name: str,
+    splitter_name: str,
+    loss_fn_name: str,
+    scheduler_name: str,
+    featurizer_name: str=None,
+    addi_args: List[Tuple[str, type, Field]] = []
+):
+    dataset_arg_spec = getfullargspec(DATASET_REGISTRY[dataset_name])
+    model_arg_spec = getfullargspec(MODEL_REGISTRY[model_name])
+    splitter_arg_spec = getfullargspec(SPLITTER_REGISTRY[splitter_name])
+    loss_fn_arg_spec = getfullargspec(LOSS_FN_REGISTRY[loss_fn_name])
+    featurizer_arg_spec = getfullargspec(FEATURIZER_REGISTRY[dataset_name])
     if scheduler_name != 'none':
-        scheduler_arg_spec = inspect.getfullargspec(SCHEDULER_REGISTRY[scheduler_name])
-        scheduler_arg_fields = get_arg_fields(scheduler_arg_spec, ArgType.SCHEDULER, ['optimizer'])
+        scheduler_arg_spec = getfullargspec(SCHEDULER_REGISTRY[scheduler_name])
+        scheduler_arg_fields = get_arg_fields(
+            scheduler_arg_spec, ArgType.SCHEDULER, ['optimizer']
+        )
     else:
         scheduler_arg_fields = []
     #!TODO: add optimizer and check the duplicate args
-    arg_fields = get_arg_fields(dataset_arg_spec, ArgType.DATASET, ['featurizer']) + \
-                 get_arg_fields(model_arg_spec, ArgType.MODEL) + \
-                 get_arg_fields(splitter_arg_spec, ArgType.SPLITTER) + \
-                 get_arg_fields(loss_fn_arg_spec, ArgType.LOSS_FN) + \
-                 get_arg_fields(featurizer_arg_spec, ArgType.FEATURIZER, ['vocab']) + \
-                 scheduler_arg_fields
-    loss_fn_field = ('loss_fn_name', str, field(default=loss_fn_name,
-                                               metadata={'type': ArgType.LOSS_FN,
-                                                         'choices': LOSS_FN_REGISTRY.keys()}))
-    dataset_field = ('dataset_name', str, field(default=dataset_name,
-                                                  metadata={'type': ArgType.DATASET,
-                                                            'choices': DATASET_REGISTRY.keys()}))
-    model_field = ('model_name', str, field(default=model_name,
-                                                metadata={'type': ArgType.MODEL,
-                                                            'choices': MODEL_REGISTRY.keys()}))
-    splitter_field = ('splitter_name', str, field(default=splitter_name,
-                                                        metadata={'type': ArgType.SPLITTER,
-                                                                    'choices': SPLITTER_REGISTRY.keys()}))
-    scheduler_field = ('scheduler_name', str, field(default=scheduler_name,
-                                                        metadata={'type': ArgType.SCHEDULER,
-                                                                    'choices': SCHEDULER_REGISTRY.keys()}))
+    arg_fields = (
+        get_arg_fields(dataset_arg_spec, ArgType.DATASET, ['featurizer']) +
+        get_arg_fields(model_arg_spec, ArgType.MODEL) +
+        get_arg_fields(splitter_arg_spec, ArgType.SPLITTER) +
+        get_arg_fields(loss_fn_arg_spec, ArgType.LOSS_FN) +
+        get_arg_fields(featurizer_arg_spec, ArgType.FEATURIZER, ['vocab']) +
+        scheduler_arg_fields
+    )
+    loss_fn_field = (
+        'loss_fn_name', 
+        str, 
+        field(
+            default=loss_fn_name,
+            metadata={'type': ArgType.LOSS_FN, 'choices': LOSS_FN_REGISTRY.keys()}
+        )
+    )
+    dataset_field = (
+        'dataset_name', 
+        str, 
+        field(
+            default=dataset_name, 
+            metadata={'type': ArgType.DATASET, 'choices': DATASET_REGISTRY.keys()}
+        )
+    )
+    model_field = (
+        'model_name', 
+        str, 
+        field(
+            default=model_name, 
+            metadata={'type': ArgType.MODEL, 'choices': MODEL_REGISTRY.keys()}
+        )
+    )
+    splitter_field = (
+        'splitter_name', 
+        str, 
+        field(
+            default=splitter_name, 
+            metadata={'type': ArgType.SPLITTER, 'choices': SPLITTER_REGISTRY.keys()}
+        )
+    )
+    scheduler_field = (
+        'scheduler_name', 
+        str, 
+        field(
+            default=scheduler_name,
+            metadata={'type': ArgType.SCHEDULER, 'choices': SCHEDULER_REGISTRY.keys()}
+        )
+    )
     if featurizer_name is None:
         featurizer_name = dataset_name
-    featurizer_field = ('featurizer_name', str, field(default=featurizer_name,
-                                                        metadata={'type': ArgType.FEATURIZER,
-                                                                    'choices': FEATURIZER_REGISTRY.keys()}))
-    arg_fields = [loss_fn_field, featurizer_field, dataset_field, model_field, splitter_field, scheduler_field] + arg_fields
+    featurizer_field = (
+        'featurizer_name', 
+        str, 
+        field(
+            default=featurizer_name,
+            metadata={'type': ArgType.FEATURIZER, 'choices': FEATURIZER_REGISTRY.keys()}
+        )
+    )
+    arg_fields = [
+        loss_fn_field, 
+        featurizer_field, 
+        dataset_field, 
+        model_field, 
+        splitter_field, 
+        scheduler_field
+    ] + arg_fields
     arg_fields += addi_args
     
     config_class = make_dataclass(class_name, arg_fields, bases=(Config,))

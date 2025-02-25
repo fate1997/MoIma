@@ -1,63 +1,83 @@
+import inspect
+from dataclasses import field
 from typing import Any, Dict
 
 import torch
 from tqdm import tqdm
 
+from moima.dataset import FEATURIZER_REGISTRY, build_featurizer
 from moima.dataset._abc import DatasetABC
 from moima.dataset.descriptor_vec.dataset import DescDataset, VecBatch
-from moima.dataset import FEATURIZER_REGISTRY, build_featurizer
 from moima.pipeline import AVAILABLE_PIPELINES
+from moima.pipeline.config import ArgType, Config, create_config_class
 # from moima.pipeline.downstream.config import DownstreamPipeConfig
-from moima.pipeline.pipe import PipeABC, FeaturizerABC
-import inspect
-from moima.pipeline.config import create_config_class, ArgType, Config
-from dataclasses import field
+from moima.pipeline.pipe import FeaturizerABC, PipeABC
 from moima.utils.evaluator.regression import RegressionMetrics
 
 
-def create_downstream_config_class(class_name: str,
-                        dataset_name: str,
-                        model_name: str,
-                        splitter_name: str,
-                        loss_fn_name: str,
-                        scheduler_name: str):
+def create_downstream_config_class(
+    class_name: str,
+    dataset_name: str,
+    model_name: str,
+    splitter_name: str,
+    loss_fn_name: str,
+    scheduler_name: str
+):
     r"""Create the downstream config class."""
-    pretrained_pipe_class = ('pretrained_pipe_class', 
-                             str, 
-                             field(default='VaAEPipe',
-                                   metadata={'help': 'The pretrained pipeline class.',
-                                             'type': ArgType.GENERAL}))
-    pretrained_pipe_path = ('pretrained_pipe_path',
-                            str,
-                            field(default=None,
-                                  metadata={'help': 'The pretrained pipeline path.',
-                                            'type': ArgType.GENERAL}))
-    Config = create_config_class(class_name,
-                                    dataset_name,
-                                    model_name,
-                                    splitter_name,
-                                    loss_fn_name,
-                                    scheduler_name,
-                                    addi_args=[pretrained_pipe_class, pretrained_pipe_path])
+    pretrained_pipe_class = (
+        'pretrained_pipe_class', 
+        str, 
+        field(
+            default='VaDEPipe',
+            metadata={
+                'help': 'The pretrained pipeline class.', 
+                'type': ArgType.GENERAL
+            }
+        )
+    )
+    pretrained_pipe_path = (
+        'pretrained_pipe_path',
+        str,
+        field(
+            default=None,
+            metadata={
+                'help': 'The pretrained pipeline path.',
+                'type': ArgType.GENERAL
+            }
+        )
+    )
+    Config = create_config_class(
+        class_name,
+        dataset_name,
+        model_name,
+        splitter_name,
+        loss_fn_name,
+        scheduler_name,
+        addi_args=[pretrained_pipe_class, pretrained_pipe_path]
+    )
     setattr(inspect.getmodule(DownstreamPipe), class_name, Config)
     Config.__module__ = inspect.getmodule(DownstreamPipe).__name__
     return Config                             
 
 
 class DownstreamPipe(PipeABC):
-    def __init__(self, 
-                 config: Config, 
-                 featurizer: FeaturizerABC = None,
-                 model_state_dict: Dict[str, Any] = None,
-                 optimizer_state_dict: Dict[str, Any] = None,
-                 scheduler_state_dict: Dict[str, Any] = None,
-                 is_training: bool = True):
-        super().__init__(config, 
-                         featurizer,
-                         model_state_dict, 
-                         optimizer_state_dict, 
-                         scheduler_state_dict,
-                         is_training)
+    def __init__(
+        self, 
+        config: Config, 
+        featurizer: FeaturizerABC = None,
+        model_state_dict: Dict[str, Any] = None,
+        optimizer_state_dict: Dict[str, Any] = None,
+        scheduler_state_dict: Dict[str, Any] = None,
+        is_training: bool = True
+    ):
+        super().__init__(
+            config, 
+            featurizer,
+            model_state_dict, 
+            optimizer_state_dict, 
+            scheduler_state_dict,
+            is_training
+        )
 
     def _forward_batch(self, batch, calc_loss=True):
         """Train the model for one iteration."""

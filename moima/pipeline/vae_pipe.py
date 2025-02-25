@@ -11,12 +11,14 @@ from moima.utils.evaluator.generation import GenerationMetrics
 from typing import Any, Dict
 
 
-VAEPipeConfig = create_config_class('VAEPipeConfig',
-                                    'smiles_seq',
-                                    'chemical_vae',
-                                    'random',
-                                    'vae_loss',
-                                    'none')
+VAEPipeConfig = create_config_class(
+    'VAEPipeConfig',
+    'smiles_seq',
+    'chemical_vae',
+    'random',
+    'vae_loss',
+    'none'
+)
 
 class VAEPipe(PipeABC):
     r"""Variational autoencoder pipeline.
@@ -26,19 +28,23 @@ class VAEPipe(PipeABC):
         model_state_dict (Dict[str, Any]): State dictionary of the model. Default to None.
         optimizer_state_dict (Dict[str, Any]): State dictionary of the optimizer. Default to None.
     """
-    def __init__(self, 
-                 config: VAEPipeConfig, 
-                 featurizer: FeaturizerABC = None,
-                 model_state_dict: Dict[str, Any] = None,
-                 optimizer_state_dict: Dict[str, Any] = None,
-                 scheduler_state_dict: Dict[str, Any] = None,
-                 is_training: bool = True):
-        super().__init__(config, 
-                         featurizer,
-                         model_state_dict, 
-                         optimizer_state_dict, 
-                         scheduler_state_dict,
-                         is_training)
+    def __init__(
+        self, 
+        config: VAEPipeConfig, 
+        featurizer: FeaturizerABC = None,
+        model_state_dict: Dict[str, Any] = None,
+        optimizer_state_dict: Dict[str, Any] = None,
+        scheduler_state_dict: Dict[str, Any] = None,
+        is_training: bool = True
+    ):
+        super().__init__(
+            config, 
+            featurizer,
+            model_state_dict, 
+            optimizer_state_dict, 
+            scheduler_state_dict,
+            is_training
+        )
     
     def _forward_batch(self, batch, calc_loss=True):
         r"""Forward a batch of data."""
@@ -61,9 +67,11 @@ class VAEPipe(PipeABC):
     def eval(self, loader_name: str='test'):
         self.logger.info('Evaluating'.center(60, "-"))
         loader = self.loader['train']
-        train_smiles = self.batch_flatten(loader, 
-                                          register_items=['smiles'],
-                                          register_output=False)['smiles']
+        train_smiles = self.batch_flatten(
+            loader, 
+            register_items=['smiles'],
+            register_output=False
+        )['smiles']
         loader = self.loader[loader_name]
         eval_outputs = self.batch_flatten(loader, register_items=['smiles'])
         eval_smiles = eval_outputs['smiles']
@@ -76,10 +84,12 @@ class VAEPipe(PipeABC):
                 for x in batch_x:
                     eval_recon_smiles.append(self.featurizer.decode(x, is_raw=False))
         sampled_smiles = self.sample(10000)
-        metrics = GenerationMetrics(sampled_smiles,
-                                    train_smiles,
-                                    eval_smiles,
-                                    eval_recon_smiles)
+        metrics = GenerationMetrics(
+            sampled_smiles,
+            train_smiles[:100],
+            eval_smiles[:10000],
+            eval_recon_smiles[:10000]
+        )
         return metrics.get_metrics()
         
     def sample(self, num_samples: int=10, label: int=None):

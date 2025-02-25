@@ -22,23 +22,27 @@ class GRUEncoder(nn.Module):
         * GRU: [batch_size, seq_len, emb_dim] -> [batch_size, seq_len, enc_hidden_dim]
         * Linear: [batch_size, seq_len, enc_hidden_dim] -> [batch_size, seq_len, enc_hidden_dim]
     """
-    def __init__(self, 
-                 vocab_dim: int=35,
-                 emb_dim: int=128,
-                 enc_hidden_dim: int=292,
-                 num_layers: int=1,
-                 latent_dim: int=292,
-                 dropout :float=0.2,
-                 num_classes: int=0):
+    def __init__(
+        self, 
+        vocab_dim: int=35,
+        emb_dim: int=128,
+        enc_hidden_dim: int=292,
+        num_layers: int=1,
+        latent_dim: int=292,
+        dropout :float=0.2,
+        num_classes: int=0
+    ):
         super().__init__()
         
         self.embedding = nn.Embedding(vocab_dim, emb_dim, padding_idx=0)
         self.emb_dropout = nn.Dropout(dropout)
-        self.gru = nn.GRU(emb_dim + num_classes, 
-                          enc_hidden_dim, 
-                          num_layers, 
-                          batch_first=True, 
-                          bidirectional=True)
+        self.gru = nn.GRU(
+            emb_dim + num_classes, 
+            enc_hidden_dim, 
+            num_layers, 
+            batch_first=True, 
+            bidirectional=True
+)
         self.fc = nn.Linear(enc_hidden_dim * 2, enc_hidden_dim)
         self.h2mu=nn.Linear(enc_hidden_dim, latent_dim)
         self.h2logvar=nn.Linear(enc_hidden_dim, latent_dim)
@@ -60,10 +64,12 @@ class GRUEncoder(nn.Module):
         if y is not None:
             y = y.unsqueeze(1).expand(-1, seq.size(1), -1)
             input_emb = torch.cat([input_emb, y], dim=-1)
-        packed_input = pack_padded_sequence(input_emb, 
-                                            seq_len.tolist(), 
-                                            batch_first=True, 
-                                            enforce_sorted=False)
+        packed_input = pack_padded_sequence(
+            input_emb, 
+            seq_len.tolist(), 
+            batch_first=True, 
+            enforce_sorted=False
+        )
         _, hidden = self.gru(packed_input)
         hidden = torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim = 1)
         hidden = self.fc(hidden)

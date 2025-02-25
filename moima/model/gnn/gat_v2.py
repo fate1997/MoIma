@@ -1,14 +1,15 @@
-import torch
-import torch.nn as nn
-from moima.dataset.mol_graph.data import GraphData
-from torch_geometric.nn import global_max_pool, global_add_pool
-from .._util import init_weight, get_activation, MLP
-
 from typing import List, Tuple
 
-from e3nn.o3 import spherical_harmonics
+import torch
+import torch.nn as nn
 from e3nn.nn import FullyConnectedNet
+from e3nn.o3 import spherical_harmonics
 from mace.modules.blocks import RadialEmbeddingBlock
+from torch_geometric.nn import global_add_pool, global_max_pool
+
+from moima.dataset.mol_graph.data import GraphData
+
+from .._util import MLP, get_activation, init_weight
 
 
 def seed_all():
@@ -17,10 +18,21 @@ def seed_all():
 
 
 class GATv2(nn.Module):
-    def __init__(self, num_atom_features: int, hidden_dim: int, num_layers: int, 
-                 num_heads: int, pred_hidden_dim: int=128, pred_dropout: float=0.2, pred_layers:int=2,
-                 activation: str='prelu', residual: bool = True, num_tasks: int = 1,
-                 bias: bool = True, dropout: float = 0.1):
+    def __init__(
+        self, 
+        num_atom_features: int, 
+        hidden_dim: int, 
+        num_layers: int, 
+        num_heads: int, 
+        pred_hidden_dim: int=128, 
+        pred_dropout: float=0.2, 
+        pred_layers:int=2,
+        activation: str='prelu', 
+        residual: bool = True, 
+        num_tasks: int = 1,
+        bias: bool = True, 
+        dropout: float = 0.1
+    ):
         super(GATv2, self).__init__()
 
         # update phase

@@ -20,13 +20,15 @@ The usage of the frameworks is simple, for example, to train a VAE model, you ca
 from moima.pipeline.vae_pipe import VAEPipe, VAEPipeConfig
 
 # Specify the parameters for the VAEPipe
-config = VAEPipeConfig(raw_path='./example/database/zinc1k.csv', 
-                        desc='pytest_run', 
-                        seq_len=120,
-                        save_interval=50000,
-                        log_interval=5,
-                        vocab_size=100,
-                        num_epochs=50)
+config = VAEPipeConfig(
+    raw_path='./example/database/zinc1k.csv', 
+    desc='pytest_run', 
+    seq_len=120,
+    save_interval=50000,
+    log_interval=5,
+    vocab_size=100,
+    num_epochs=50
+)
 
 
 pipe = VAEPipe(config)

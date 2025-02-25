@@ -147,8 +147,7 @@ class PipeABC(ABC):
         hash_config = self.config.get_hash_key(exclude=self.featurizer.arg4model.keys())
         folder = f'{self.__class__.__name__}_{self.config.desc}_{hash_config}'
         work_dir = os.path.join(self.config.output_folder, folder)
-        if not os.path.exists(work_dir):
-            os.makedirs(work_dir)
+        os.makedirs(work_dir, exist_ok=True)
         return work_dir
     
     def build_dataset(self) -> DatasetABC:
@@ -221,11 +220,13 @@ class PipeABC(ABC):
             scheduler.load_state_dict(state_dict)
         return scheduler        
     
-    def batch_flatten(self, 
-                      loader: DataLoader, 
-                      register_items: List[str]=[],
-                      return_numpy: bool=False,
-                      register_output: bool=True) -> Dict[str, Any]:
+    def batch_flatten(
+        self, 
+        loader: DataLoader, 
+        register_items: List[str]=[],
+        return_numpy: bool=False,
+        register_output: bool=True
+    ) -> Dict[str, Any]:
         """Flatten the batch data."""
         self.model.eval()
         results = defaultdict(list)

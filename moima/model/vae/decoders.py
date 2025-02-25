@@ -21,14 +21,16 @@ class GRUDecoder(nn.Module):
         * GRU: [batch_size, seq_len, emb_dim] -> [batch_size, seq_len, hidden_dim]
         * Linear: [batch_size, seq_len, hidden_dim] -> [batch_size, seq_len, vocab_dim]
     """
-    def __init__(self, 
-                 embedding: nn.Embedding,
-                 emb_dropout=0.2,
-                 latent_dim=292,
-                 hidden_dim=501,
-                 num_layers=1,
-                 vocab_dim=35,
-                 emb_dim=128):
+    def __init__(
+        self, 
+        embedding: nn.Embedding,
+        emb_dropout=0.2,
+        latent_dim=292,
+        hidden_dim=501,
+        num_layers=1,
+        vocab_dim=35,
+        emb_dim=128
+    ):
         super().__init__()
         
         self.embedding = embedding

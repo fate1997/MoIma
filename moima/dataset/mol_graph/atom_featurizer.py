@@ -1,6 +1,6 @@
 # Generate atom features
 
-from typing import Any, Callable, Dict, List
+from typing import Callable, Dict, List
 
 import numpy as np
 import random
@@ -19,9 +19,11 @@ ATOM_FEATURES_GENERATOR_REGISTRY = {}
 
 
 class AtomFeaturizer:
-    def __init__(self, 
-                 generator_name_list: List[str], 
-                 params: Dict[str, dict]={}):
+    def __init__(
+        self, 
+        generator_name_list: List[str], 
+        params: Dict[str, dict]={}
+    ):
         if 'all' in generator_name_list:
             generator_name_list = get_avail_atom_features()
         self.generator_name_list = generator_name_list
@@ -48,7 +50,8 @@ class AtomFeaturizer:
         
         for name in self.generator_name_list:
             if 'MOLINPUT' in name:
-                add_features = get_atom_feature_generator(name)(mol, **self.params[name])
+                feature_fn = get_atom_feature_generator(name)
+                add_features = feature_fn(mol, **self.params[name])
                 atom_features = np.concatenate([atom_features, add_features], axis=1)
         atom_features = torch.from_numpy(np.stack(atom_features, axis=0)).float()
         return atom_features
@@ -60,10 +63,11 @@ class AtomFeaturizer:
                 continue
             if name not in self.available_features:
                 raise ValueError(f'Features generator "{name}" could not be found.')
+            feature_fn = get_atom_feature_generator(name)
             if name in self.params:
-                atom_features += get_atom_feature_generator(name)(atom, **self.params[name])
+                atom_features += feature_fn(atom, **self.params[name])
             else:
-                atom_features += get_atom_feature_generator(name)(atom)
+                atom_features += feature_fn(atom)
         return np.array(atom_features)
     
     def __repr__(self):
@@ -87,8 +91,9 @@ def one_hot_encoding(value: int, choices: List) -> List:
     return encoding
 
 
-def register_atom_features_generator(features_generator_name: str) \
-                                    -> Callable[[AtomFeaturesGenerator], AtomFeaturesGenerator]:
+def register_atom_features_generator(
+    features_generator_name: str
+) -> Callable[[AtomFeaturesGenerator], AtomFeaturesGenerator]:
     r"""Decorates a function as a feature generator and registers it in global 
         dictionaries to enable access by name.
     
@@ -213,7 +218,8 @@ def tsne_generator(mol: Chem.Mol,
     return pos
 
 
-@register_atom_features_generator('invariant_pca_MOLINPUT')
+#! For Frame Averaging Method
+# @register_atom_features_generator('invariant_pca_MOLINPUT')
 def invariant_pca_generator(mol: Chem.Mol):
     r"""Generates the invariant PCA features of the atom."""
     assert mol.GetNumConformers() > 0, 'No conformer found.'
@@ -223,14 +229,16 @@ def invariant_pca_generator(mol: Chem.Mol):
     pca = PCA(n_components=3)
     pca.fit(pos)
     comp = pca.components_
-    sign_variants = np.array([[1, 1, 1],
-                    [1, 1, -1],
-                    [1, -1, 1],
-                    [1, -1, -1],
-                    [-1, 1, 1],
-                    [-1, 1, -1],
-                    [-1, -1, 1],
-                    [-1, -1, -1]])
+    sign_variants = np.array([
+        [1, 1, 1],
+        [1, 1, -1],
+        [1, -1, 1],
+        [1, -1, -1],
+        [-1, 1, 1],
+        [-1, 1, -1],
+        [-1, -1, 1],
+        [-1, -1, -1]
+    ])
     index = random.randint(0, sign_variants.shape[0] - 1)
     sign = sign_variants[index]
     comp = comp * sign
@@ -238,12 +246,15 @@ def invariant_pca_generator(mol: Chem.Mol):
     return pos
 
 
+#! Experimental Feature
 # @register_atom_features_generator('geo_env_MOLINPUT')
-def geometry_env_generator(mol: Chem.Mol, 
-                           feature_dim: int=32,
-                           min_dist: float=1.0,
-                           cutoff: float=5.0, 
-                           n: int=1):
+def geometry_env_generator(
+    mol: Chem.Mol, 
+    feature_dim: int=32,
+    min_dist: float=1.0,
+    cutoff: float=5.0, 
+    n: int=1
+):
     r"""Generates the geometry environment of the atom."""
     assert mol.GetNumConformers() > 0, 'No conformer found.'
     pos = mol.GetConformer().GetPositions()

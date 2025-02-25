@@ -20,18 +20,21 @@ class DescDataset(DatasetABC):
         force_reload (bool): Whether to force reload the data.
         save_processed (bool): Whether to save the processed data.
     """
-    def __init__(self, 
-                 raw_path: str, 
-                 featurizer: DescFeaturizer,
-                 label_col: Union[str, List[str]],
-                 additional_cols: List[str] = [],
-                 processed_path: str = None, 
-                 force_reload: bool = False, 
-                 save_processed: bool = False):
+    def __init__(
+        self, 
+        raw_path: str, 
+        featurizer: DescFeaturizer,
+        label_col: Union[str, List[str]],
+        additional_cols: List[str] = [],
+        processed_path: str = None, 
+        force_reload: bool = False, 
+        save_processed: bool = False
+    ):
         self.label_col = [label_col] if isinstance(label_col, str) else label_col
         self.additional_cols = additional_cols
-        super().__init__(raw_path, featurizer, processed_path, force_reload, 
-                         save_processed)
+        super().__init__(
+            raw_path, featurizer, processed_path, force_reload, save_processed
+        )
         
     @staticmethod
     def collate_fn(batch: List[VecData]):

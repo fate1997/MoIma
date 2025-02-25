@@ -1,11 +1,13 @@
 # repo-specific
 output/
 *debug.ipynb
+debug_notebooks/
 Reference/
 /example/
 .pretrain
 result/
 *_temp/
+backup/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
